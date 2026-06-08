@@ -10,6 +10,14 @@ BODY="${4:?Missing message body}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  agmsg_remote_send_message "$TEAM" "$FROM" "$TO" "$BODY"
+  echo "Sent to $TO in team $TEAM"
+  exit 0
+fi
+
 DB="$(agmsg_db_path)"
 
 if [ ! -f "$DB" ]; then

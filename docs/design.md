@@ -138,4 +138,5 @@ Claude Code command is installed separately to `~/.claude/commands/<cmd>.md`.
 - **sqlite3** — database and JSON manipulation (JSON1 extension)
 - **awk/sed** — text processing (config, TOML editing)
 
-No python3, no node, no network, no daemon.
+Local mode has no python3, no node, no network, and no daemon. Remote server
+mode is optional and requires Node.js 24+ on the server host.

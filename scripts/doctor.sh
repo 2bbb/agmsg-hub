@@ -55,6 +55,7 @@ SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CODEX_CONFIG="${AGMSG_CODEX_CONFIG:-$HOME/.codex/config.toml}"
 
 source "$SCRIPT_DIR/lib/codex-config.sh"
+source "$SCRIPT_DIR/lib/storage.sh"
 
 failures=0
 warnings=0
@@ -233,6 +234,8 @@ check_executable "$SCRIPT_DIR/join.sh" "join.sh" "script.join"
 check_executable "$SCRIPT_DIR/inbox.sh" "inbox.sh" "script.inbox"
 check_executable "$SCRIPT_DIR/send.sh" "send.sh" "script.send"
 check_executable "$SCRIPT_DIR/delivery.sh" "delivery.sh" "script.delivery"
+check_executable "$SCRIPT_DIR/server.sh" "server.sh" "script.server"
+check_executable "$SCRIPT_DIR/remote.sh" "remote.sh" "script.remote"
 check_command sqlite3 sqlite3 "dependency.sqlite3"
 check_writable_dir "$SKILL_DIR/db" "db directory" "storage.db_dir"
 check_writable_dir "$SKILL_DIR/teams" "teams directory" "storage.teams_dir"
@@ -258,13 +261,23 @@ if [ "$AGENT_TYPE" = "codex" ]; then
   esac
 fi
 
-if [ -n "${AGMSG_REMOTE_URL:-}" ]; then
+if agmsg_using_remote_storage; then
   check_command curl curl "dependency.curl"
+  check_command node node "dependency.node"
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  if agmsg_remote_health >/dev/null 2>&1; then
+    ok "remote.health" "remote storage server is reachable"
+  else
+    fail "remote.health" "remote storage is active but the server is unreachable"
+  fi
+elif [ -n "$(agmsg_remote_url)" ]; then
+  check_command curl curl "dependency.curl"
+  warn "remote.storage" "remote server is configured but storage.active is not remote"
 else
   if [ "$AGENT_TYPE" = "codex" ]; then
     warn "remote.storage" "remote storage is not configured; Codex Cloud mode cannot use local agmsg storage yet"
   else
-    warn "remote.storage" "remote storage is not configured; set AGMSG_REMOTE_URL only when using future server mode"
+    warn "remote.storage" "remote storage is not configured"
   fi
 fi
 

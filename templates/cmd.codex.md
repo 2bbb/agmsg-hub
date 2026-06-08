@@ -1,6 +1,6 @@
 ---
 name: __SKILL_NAME__
-description: Cross-agent messaging via SQLite. Send messages between Claude Code, Codex, Gemini CLI, and other agents. No daemon, no network, no dependencies beyond bash and sqlite3.
+description: Cross-agent messaging via local SQLite by default, with optional remote HTTP storage. Send messages between Claude Code, Codex, Gemini CLI, and other agents.
 ---
 
 Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER directly read or edit config files, DB, or team data. There is NO register.sh — use join.sh to join a team.**
@@ -9,7 +9,7 @@ Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER dir
 
 - Local mode expects Bash and sqlite3. On Windows, use WSL or Git Bash; native Windows shells are not supported yet.
 - Local and Worktree modes can use local SQLite storage if `db/` and `teams/` are writable.
-- Cloud mode cannot access this machine's local agmsg database. Remote storage is planned but not implemented yet.
+- Cloud mode cannot access this machine's local agmsg database. Use remote storage when Cloud needs shared agmsg state.
 - Codex supports `turn` and `off` delivery only. Never offer `monitor` or `both`.
 - If setup fails, run `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh codex "$(pwd)"`. Use `--porcelain` for stable agent-readable diagnostics and `--apply-fixes` only when the user wants to add missing Codex `writable_roots`.
 
@@ -119,7 +119,23 @@ If argument is "doctor raw":
 If argument is "doctor fix" or "doctor apply-fixes":
 1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes --porcelain codex "$(pwd)"`
 2. Summarize what changed. This command may create or edit the Codex config and writes a `<config>.bak` backup when editing an existing file.
-3. Do not claim remote storage is ready; warnings about Codex Cloud remain expected until remote storage is implemented.
+3. If storage.active is remote and doctor reports `remote.health` failure, tell the user the configured server is unreachable.
+
+If argument is "remote status":
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status`
+2. Show whether `storage.active` is `sqlite` or `remote`, and whether the remote server is reachable.
+
+If argument starts with "remote configure" (e.g. "remote configure http://127.0.0.1:8787"):
+1. Parse the URL and optional token.
+2. Run: `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh configure <url> [token]`
+3. Do not switch storage yet unless the user explicitly asks.
+
+If argument is "remote on" or "remote switch remote":
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch remote`
+2. If it fails, report that the server must be reachable before switching.
+
+If argument is "remote off" or "remote switch local":
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch local`
 
 If argument is "config":
 1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/config.sh show`

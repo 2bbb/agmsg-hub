@@ -14,6 +14,31 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  UNREAD="$(agmsg_remote_unread_rows "$TEAM" "$AGENT" 100)"
+
+  if [ -z "$UNREAD" ]; then
+    if [ "$QUIET" = true ]; then exit 0; fi
+    echo "No new messages."
+    exit 0
+  fi
+
+  COUNT=$(echo "$UNREAD" | wc -l | tr -d ' ')
+  echo "$COUNT new message(s):"
+  echo ""
+  IDS=()
+  while IFS=$'\t' read -r id from body ts; do
+    IDS+=("$id")
+    echo "  [$ts] $from: $body"
+  done <<< "$UNREAD"
+  echo ""
+
+  agmsg_remote_mark_read "$TEAM" "$AGENT" "${IDS[@]}" 2>/dev/null || true
+  exit 0
+fi
+
 DB="$(agmsg_db_path)"
 
 if [ ! -f "$DB" ]; then

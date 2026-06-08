@@ -6,8 +6,8 @@ local-first design and agent-to-agent messaging model, but it is not trying to
 remain the upstream/mainline path.
 
 Cross-agent messaging for CLI AI agents. agmsg-hub keeps agmsg's local-first
-CLI workflow while adding Codex app diagnostics and planned optional remote
-sharing. No daemon, no network, no complexity by default.
+CLI workflow while adding Codex app diagnostics and optional remote sharing.
+No daemon, no network, no complexity by default.
 
 Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, and any CLI agent can message each other via a shared SQLite database.
 
@@ -52,8 +52,7 @@ After setup, your agent handles everything — just talk to it naturally. "Send 
 agmsg is a Bash + SQLite tool. macOS and Linux are the primary targets.
 Windows native shells are not a supported target for the local SQLite mode yet;
 use WSL or Git Bash with `bash` and `sqlite3` available. Server-backed remote
-mode may improve native Windows ergonomics later, but that mode is not
-implemented yet.
+mode is available as an opt-in MVP and requires Node.js 24+ on the server host.
 
 The **command name** determines:
 - Skill folder: `~/.agents/skills/<cmd>/`
@@ -214,8 +213,8 @@ Codex supports `mode turn` and `mode off` only — there's no Monitor tool to st
 
 In the Codex app, Local and Worktree modes can use agmsg's local SQLite store
 when the installed skill's `db/` and `teams/` directories are writable by the
-sandbox. Cloud mode requires future remote storage and is not supported by
-local SQLite mode yet.
+sandbox. Cloud mode cannot use this machine's local SQLite file directly; use
+the optional remote server mode when Cloud needs shared storage.
 
 See [Codex App Guide](docs/codex-app.md) for Local/Worktree/Cloud support and
 the manual acceptance checklist.
@@ -247,6 +246,37 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 
 `hook.sh on|off` still works as a legacy alias for `delivery.sh set turn|off` but prints a deprecation notice.
 
+## Remote Server MVP
+
+Local SQLite remains the default. Remote mode is opt-in and currently covers
+the core message flow: `send.sh`, `inbox.sh`, and `history.sh` over HTTP.
+
+Start a server on the machine that should own the shared SQLite store:
+
+```bash
+~/.agents/skills/agmsg/scripts/server.sh serve --host 127.0.0.1 --port 8787
+```
+
+Configure a client and switch it to remote storage:
+
+```bash
+~/.agents/skills/agmsg/scripts/remote.sh configure http://127.0.0.1:8787
+~/.agents/skills/agmsg/scripts/remote.sh switch remote
+~/.agents/skills/agmsg/scripts/remote.sh status
+```
+
+You can also test remote mode without changing config:
+
+```bash
+AGMSG_STORAGE_DRIVER=remote \
+AGMSG_REMOTE_URL=http://127.0.0.1:8787 \
+~/.agents/skills/agmsg/scripts/send.sh myteam alice bob "hi over remote"
+```
+
+For anything beyond localhost, put it behind SSH forwarding, VPN, or a real
+authenticated reverse proxy. Do not expose an unauthenticated agmsgd directly
+to the public internet.
+
 ## Update
 
 ```bash
@@ -274,8 +304,11 @@ Auto-detects installed skill directories and cleans up: skill files, slash comma
 | Variable | Default | Purpose |
 |---|---|---|
 | `AGMSG_STORAGE_PATH` | `<skill>/db` | Directory holding the SQLite message store (`messages.db`). Override to relocate the store — handy for tests, sandboxes, or running isolated instances. |
+| `AGMSG_STORAGE_DRIVER` | `sqlite` | Set to `remote` to use the remote HTTP storage client without changing config. |
+| `AGMSG_REMOTE_URL` | unset | Remote agmsgd base URL used when storage driver is `remote`. |
+| `AGMSG_REMOTE_TOKEN` | unset | Bearer token for remote agmsgd when the server is started with `--token`. |
 
-The message store path resolves as **`AGMSG_STORAGE_PATH` (env) > built-in default**. (A config-file layer is planned to slot in between the two as part of the storage-driver work; the intended order is env > config > default.) The override is scoped to the SQLite store only — team configs under `teams/` are unaffected.
+The local message store path resolves as **`AGMSG_STORAGE_PATH` (env) > built-in default**. The override is scoped to the SQLite store only — team configs under `teams/` are unaffected.
 
 ```bash
 # Run against an isolated store
@@ -304,11 +337,11 @@ bats tests/    # requires bats-core: brew install bats-core
 ```
 
 - **Storage**: Single SQLite file with WAL mode
+- **Remote mode**: Optional Node.js HTTP server owning a SQLite store
 - **Concurrency**: Multiple readers + 1 writer, no conflicts
-- **Dependencies**: bash, sqlite3 (no python3 required)
+- **Dependencies**: bash, sqlite3 for local mode; Node.js 24+ for server mode
 - **Auto detection**: Stop hook checks inbox after each response (60s cooldown)
-- **No daemon**: Direct filesystem access
-- **No network**: Everything local
+- **Default mode**: No daemon and no network; direct filesystem access
 
 ## Contributing
 

@@ -4,8 +4,9 @@ agmsg local mode is usable from the Codex app only when the installed skill can
 write its local data directories. The current supported local-mode targets are
 macOS and Linux. On Windows, use WSL or Git Bash with `bash` and `sqlite3`.
 
-Remote storage is planned but not implemented. Codex Cloud mode therefore
-cannot use this machine's local agmsg database yet.
+Remote storage is available as an opt-in MVP. Codex Cloud mode cannot use this
+machine's local agmsg database directly, but it can use an agmsgd server if the
+Cloud environment can reach the configured URL.
 
 ## Supported Modes
 
@@ -13,7 +14,7 @@ cannot use this machine's local agmsg database yet.
 |---|---|---|
 | Local | supported | Requires writable `db/` and `teams/` under the installed skill. |
 | Worktree | supported | Same as Local; confirm writable roots for the installed skill path. |
-| Cloud | not supported yet | Requires future remote storage. |
+| Cloud | remote only | Requires a reachable agmsgd server; local SQLite files are not available. |
 
 Codex supports `turn` and `off` delivery only. Do not use `monitor` or `both`.
 
@@ -68,7 +69,7 @@ Use this checklist before treating Codex app local support as working.
    Acceptance:
 
    - The command reports no failures.
-   - Warnings about remote storage are acceptable.
+   - Warnings about remote storage are acceptable when using local mode.
    - If writable-root failures appear, `$agmsg doctor fix` repairs only Codex writable roots.
 
 5. Run:
@@ -122,14 +123,15 @@ $agmsg doctor
 
 Acceptance:
 
-- The user is told local storage is not available for Cloud mode until remote
-  storage exists.
+- The user is told local storage is not available from Cloud mode.
+- If remote storage is configured, `$agmsg remote status` reports
+  `remote.health=ok`.
 - The workflow does not claim that local `~/.agents/skills/agmsg` data is
   available from Cloud mode.
 
-If the skill is not available in Cloud mode, that is also acceptable for v0.1.
-The important point is that v0.1 must not imply Cloud can use the user's local
-SQLite database.
+If the skill is not available in Cloud mode, that is still acceptable for the
+local-mode release path. The important point is that agmsg must not imply Cloud
+can use the user's local SQLite database.
 
 ## Troubleshooting
 

@@ -203,13 +203,13 @@ Acceptance criteria:
 
 - `$agmsg` is discoverable and invokable in Codex app where skills are available.
 - Local and Worktree modes can use local storage.
-- Cloud mode explicitly states local storage is unavailable until remote storage lands.
+- Cloud mode explicitly states local storage is unavailable and remote storage is required.
 - Diagnostics report missing `sqlite3`, missing writable roots, missing config, and unsupported delivery mode.
 
 Current implementation notes:
 
 - `scripts/doctor.sh codex <project>` exists.
-- `doctor.sh` validates skill files, Codex metadata, executable scripts, `sqlite3`, writable `db/` and `teams/`, Codex `writable_roots`, Codex hooks JSON, delivery-mode compatibility, and remote-storage absence.
+- `doctor.sh` validates skill files, Codex metadata, executable scripts, `sqlite3`, writable `db/` and `teams/`, Codex `writable_roots`, Codex hooks JSON, delivery-mode compatibility, and remote health when remote storage is active.
 - Codex config parsing/updating lives in `scripts/lib/codex-config.sh`; `doctor.sh` owns output and diagnostic flow.
 - `doctor.sh --porcelain` emits stable `check`, `fix`, and `summary` records for agent-mediated repair flows.
 - `doctor.sh --apply-fixes` explicitly adds missing Codex `writable_roots` and leaves DB/team/hook state untouched.
@@ -226,7 +226,7 @@ Verification:
 Known non-goals for v0.1:
 
 - Codex Cloud local SQLite access.
-- Remote storage.
+- Production-grade remote storage.
 - Native Windows local-mode support.
 
 ### Phase 2: `agmsgd` server MVP

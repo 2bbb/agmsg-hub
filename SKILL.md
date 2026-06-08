@@ -1,6 +1,6 @@
 ---
 name: agmsg
-description: Cross-agent messaging via SQLite. Send messages between Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, and other agents. No daemon, no network, no dependencies beyond bash and sqlite3.
+description: Cross-agent messaging via local SQLite by default, with optional remote HTTP storage. Send messages between Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, and other agents.
 ---
 
 # Agent Messaging
@@ -13,12 +13,12 @@ description: Cross-agent messaging via SQLite. Send messages between Claude Code
 
 - macOS and Linux are the primary local-mode targets.
 - Windows native shells are not supported yet. Use WSL or Git Bash with `bash` and `sqlite3`.
-- Remote storage is planned but not implemented.
+- Remote storage is available as an opt-in MVP. Local SQLite remains the default.
 
 ## Codex app notes
 
 - Local and Worktree modes can use the local SQLite store when the skill's `db/` and `teams/` directories are writable.
-- Cloud mode cannot rely on this machine's local skill database. Use local mode for now; remote storage is planned but not implemented.
+- Cloud mode cannot rely on this machine's local skill database. Use remote storage when Cloud needs shared agmsg state.
 - Codex supports `turn` and `off` delivery only. Do not offer `monitor` or `both`.
 - To diagnose installation, sandbox, and delivery issues, run:
 
@@ -65,6 +65,12 @@ Do NOT manually edit config files. Always use join.sh.
 ~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain <type> "$(pwd)"
 ~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes codex "$(pwd)"
 
+# Remote storage MVP
+~/.agents/skills/__SKILL_NAME__/scripts/server.sh serve --host 127.0.0.1 --port 8787
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh configure http://127.0.0.1:8787
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch remote
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status
+
 # List team members
 ~/.agents/skills/__SKILL_NAME__/scripts/team.sh <team>
 
@@ -109,5 +115,6 @@ Do NOT manually edit config files. Always use join.sh.
 - **Storage**: SQLite with WAL mode in `~/.agents/skills/__SKILL_NAME__/db/messages.db`
 - **Teams**: `~/.agents/skills/__SKILL_NAME__/teams/<name>/config.json`
 - **Concurrency**: WAL allows multiple readers + 1 writer without conflicts
-- **No daemon**: Direct DB access via `sqlite3` CLI
-- **Dependencies**: bash, sqlite3 (no python3 required)
+- **Default mode**: Direct DB access via `sqlite3` CLI; no daemon and no network
+- **Remote mode**: Optional Node.js HTTP server owning a SQLite store
+- **Dependencies**: bash and sqlite3 for local mode; Node.js 24+ for server mode

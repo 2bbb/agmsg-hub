@@ -135,6 +135,13 @@ create_default_config() {
 # project's .claude/settings.local.json by `delivery.sh status`. There is
 # no global "mode" key. Only machine-wide tuning lives here.
 
+storage:
+  active: sqlite
+
+remote:
+  url:
+  token:
+
 delivery:
   monitor:
     # watch.sh SQLite poll interval, seconds

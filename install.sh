@@ -121,7 +121,7 @@ if [ "$UPDATE_ONLY" = true ]; then
     sed "s/__SKILL_NAME__/$SKILL_NAME/g" "$SCRIPT_DIR/templates/cmd.copilot.md" > "$COPILOT_SKILL_DIR/SKILL.md"
   fi
   cp "$SCRIPT_DIR/openai.yaml" "$SKILL_DIR/agents/openai.yaml" 2>/dev/null || true
-  chmod +x "$SKILL_DIR/scripts/"*.sh
+  chmod +x "$SKILL_DIR/scripts/"*.sh "$SKILL_DIR/scripts/"*.mjs
   echo "  + updated scripts, templates, and SKILL.md"
   echo "  ~ DB and team configs preserved"
   echo ""
@@ -167,7 +167,7 @@ for tmpl in "$SCRIPT_DIR/templates/"cmd.*.md; do
 done
 
 cp "$SCRIPT_DIR/openai.yaml" "$SKILL_DIR/agents/openai.yaml" 2>/dev/null || true
-chmod +x "$SKILL_DIR/scripts/"*.sh
+chmod +x "$SKILL_DIR/scripts/"*.sh "$SKILL_DIR/scripts/"*.mjs
 
 # Marker file for uninstall detection
 touch "$SKILL_DIR/.agmsg"

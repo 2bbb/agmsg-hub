@@ -10,6 +10,22 @@ LIMIT="${3:-20}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  RESULT="$(agmsg_remote_history_rows "$TEAM" "$AGENT" "$LIMIT")"
+
+  if [ -z "$RESULT" ]; then
+    echo "No message history."
+    exit 0
+  fi
+
+  while IFS=$'\t' read -r from to body ts status; do
+    echo "  $status [$ts] $from → $to: $body"
+  done <<< "$RESULT"
+  exit 0
+fi
+
 DB="$(agmsg_db_path)"
 
 if [ ! -f "$DB" ]; then

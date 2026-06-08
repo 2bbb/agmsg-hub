@@ -21,9 +21,14 @@ teardown() {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --cmd agmsg
   [ -f "$SK/scripts/lib/storage.sh" ]
   [ -f "$SK/scripts/lib/codex-config.sh" ]
+  [ -f "$SK/scripts/lib/remote-client.sh" ]
   [ -d "$SK/teams" ]
   [ -x "$SK/scripts/doctor.sh" ]
+  [ -x "$SK/scripts/server.sh" ]
+  [ -x "$SK/scripts/remote.sh" ]
+  [ -x "$SK/scripts/agmsgd.mjs" ]
   grep -q 'doctor.sh --porcelain codex "$(pwd)"' "$SK/SKILL.md"
+  grep -q 'remote.sh status' "$SK/SKILL.md"
 
   # End-to-end through the installed scripts — a missing sourced helper would
   # surface here, not just as a stat on a file.
@@ -43,7 +48,11 @@ teardown() {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --update
   [ -f "$SK/scripts/lib/storage.sh" ]
   [ -f "$SK/scripts/lib/codex-config.sh" ]
+  [ -f "$SK/scripts/lib/remote-client.sh" ]
   [ -d "$SK/teams" ]
+  [ -x "$SK/scripts/server.sh" ]
+  [ -x "$SK/scripts/remote.sh" ]
+  [ -x "$SK/scripts/agmsgd.mjs" ]
   run bash "$SK/scripts/send.sh" demo alice bob "after update"
   [ "$status" -eq 0 ]
 }

@@ -34,7 +34,14 @@ detect_cli_type() {
     return 0
   fi
 
-  # 2. Fall back to process tree detection
+  # 2. Fall back to process tree detection. Tests can disable this so "no
+  # env vars set" remains testable even when bats itself runs under Codex or
+  # another supported agent.
+  if [ -n "${AGMSG_DISABLE_PROCESS_DETECTION:-}" ]; then
+    echo "claude-code"
+    return 0
+  fi
+
   local pid=$$
   local max_depth=10
   local depth=0

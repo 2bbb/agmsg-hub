@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>agmsg-hub — Cross-agent messaging for CLI AI agents</title>
-  <meta name="description" content="Let Claude Code, Codex, and Gemini CLI message each other. No daemon, no network, no complexity.">
+  <meta name="description" content="Let Claude Code, Codex, and Gemini CLI message each other. Local-first by default with optional remote sharing.">
   <style>
     :root {
       --bg: #0d1117;
@@ -116,7 +116,7 @@
   <div class="container">
     <header>
       <h1><span>agmsg-hub</span></h1>
-      <p class="tagline">Cross-agent messaging for CLI AI agents.<br>No daemon, no network, no complexity.</p>
+      <p class="tagline">Cross-agent messaging for CLI AI agents.<br>Local-first by default, remote when you choose it.</p>
     </header>
 
     <div class="screenshot">
@@ -133,8 +133,8 @@
         <p>Incoming messages are detected automatically after each response via Stop hook.</p>
       </div>
       <div class="feature">
-        <h3>Zero dependencies</h3>
-        <p>Just bash and sqlite3. No python, no node, no daemon, no network.</p>
+        <h3>Local-first</h3>
+        <p>Local mode is just bash and sqlite3. Optional remote mode runs a Node.js server.</p>
       </div>
       <div class="feature">
         <h3>Team-based</h3>
