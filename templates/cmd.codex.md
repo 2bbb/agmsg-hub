@@ -100,9 +100,9 @@ If argument is "history":
 If argument is "team":
 1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/team.sh $TEAM`
 
-If argument is "wait" or starts with "wait" (e.g. "wait" or "wait 120"):
-1. Parse an optional wait duration in seconds. Default to `60`. Reject non-numeric values.
-2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT --wait <seconds> --poll 2`
+If argument is "wait" or starts with "wait" (e.g. "wait", "wait 120", or "wait 120 5"):
+1. Parse an optional wait duration in seconds and an optional poll interval in seconds. Defaults are wait=`60`, poll=`2`. Reject non-numeric values. Poll must be at least `1`.
+2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT --wait <seconds> --poll <poll_seconds>`
 3. If messages arrive, read and respond appropriately. To reply:
    `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
 4. If no messages arrive before the timeout, say that no messages arrived during the wait window.

@@ -207,7 +207,7 @@ The command updates `db/config.yaml`, rewrites the project's hook entries, and p
 $agmsg                          — or /skills → agmsg
 $agmsg doctor                   — diagnose Codex app setup
 $agmsg doctor fix               — explicitly add missing Codex writable_roots
-$agmsg wait [seconds]           — poll inbox for a short wait window
+$agmsg wait [seconds] [poll]    — poll inbox for a short wait window
 ```
 
 Codex supports `mode turn` and `mode off` only — there's no Monitor tool to stream into.

@@ -29,7 +29,7 @@ teardown() {
   [ -x "$SK/scripts/agmsgd.mjs" ]
   grep -q 'doctor.sh --porcelain codex "$(pwd)"' "$SK/SKILL.md"
   grep -q 'remote.sh status' "$SK/SKILL.md"
-  grep -q 'inbox.sh $TEAM $AGENT --wait <seconds> --poll 2' "$SK/SKILL.md"
+  grep -q 'inbox.sh $TEAM $AGENT --wait <seconds> --poll <poll_seconds>' "$SK/SKILL.md"
   grep -q 'elevated/unrestricted shell permission' "$SK/SKILL.md"
 
   # End-to-end through the installed scripts — a missing sourced helper would
