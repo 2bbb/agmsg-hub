@@ -41,6 +41,8 @@ That's it. Once two agents have joined the same team, they can message each othe
 
 After setup, your agent handles everything — just talk to it naturally. "Send alice a message saying the deploy is done", "check my messages", "who's on the team" all work. The shell scripts below are for reference and advanced use.
 
+For hands-on Codex, remote server, multi-machine setup, update, and troubleshooting steps, see [Instructions](instructions.md).
+
 ## Install
 
 ```bash
