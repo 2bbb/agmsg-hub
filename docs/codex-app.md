@@ -18,6 +18,13 @@ Cloud environment can reach the configured URL.
 
 Codex supports `turn` and `off` delivery only. Do not use `monitor` or `both`.
 
+Remote mode uses HTTP via `curl`. Codex app/CLI sandboxes may block localhost
+or LAN HTTP even when the agmsgd server is healthy. If `$agmsg doctor`,
+`$agmsg remote status`, `send`, `inbox`, or `history` fails with a connection,
+DNS, timeout, or sandbox/network error, rerun the same agmsg script once with
+elevated/unrestricted shell permission before treating the server as
+unreachable.
+
 ## Diagnostics
 
 Run:
@@ -126,6 +133,9 @@ Acceptance:
 - The user is told local storage is not available from Cloud mode.
 - If remote storage is configured, `$agmsg remote status` reports
   `remote.health=ok`.
+- If `remote.health` fails but Terminal `curl` succeeds, the workflow retries
+  the same agmsg command with elevated/unrestricted shell permission before
+  reporting the server as unreachable.
 - The workflow does not claim that local `~/.agents/skills/agmsg` data is
   available from Cloud mode.
 

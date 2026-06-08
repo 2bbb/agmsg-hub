@@ -11,6 +11,7 @@ Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER dir
 - Local and Worktree modes can use local SQLite storage if `db/` and `teams/` are writable.
 - Cloud mode cannot access this machine's local agmsg database. Use remote storage when Cloud needs shared agmsg state.
 - Codex supports `turn` and `off` delivery only. Never offer `monitor` or `both`.
+- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, or `history` fails in remote mode with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
 - If setup fails, run `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh codex "$(pwd)"`. Use `--porcelain` for stable agent-readable diagnostics and `--apply-fixes` only when the user wants to add missing Codex `writable_roots`.
 
 ## Identity
@@ -84,6 +85,8 @@ Four possible outputs:
 
 **Only use scripts in `~/.agents/skills/__SKILL_NAME__/scripts/` — do not read or modify files under `teams/` or `db/` directly.**
 
+When storage.active is remote, `send.sh`, `inbox.sh`, `history.sh`, `doctor.sh`, and `remote.sh status` may need network/localhost access. If one of these commands fails with a curl connection error, DNS error, timeout, or sandbox/network denial, rerun the exact same script once with elevated/unrestricted shell permission before reporting failure.
+
 **If no arguments provided (DEFAULT action — always do this when the command is invoked without arguments):**
 1. **IMMEDIATELY** run inbox check for each TEAM: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT`
 2. Do NOT ask the user what to do — just run the inbox check.
@@ -111,6 +114,7 @@ If argument is "doctor":
    - `summary ok 0 <warnings>` means setup is usable.
 3. Summarize failures first, then warnings. Do not dump every ok line unless the user asks for raw output.
 4. If fix records are present, tell the user they can run `$__SKILL_NAME__ doctor fix` to apply only the missing Codex `writable_roots` entries.
+5. If storage.active is remote and `remote.health` fails, do not conclude the server is down until `remote.sh status` or the failing command has been retried once with elevated/unrestricted shell permission.
 
 If argument is "doctor raw":
 1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain codex "$(pwd)"`
@@ -119,10 +123,10 @@ If argument is "doctor raw":
 If argument is "doctor fix" or "doctor apply-fixes":
 1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes --porcelain codex "$(pwd)"`
 2. Summarize what changed. This command may create or edit the Codex config and writes a `<config>.bak` backup when editing an existing file.
-3. If storage.active is remote and doctor reports `remote.health` failure, tell the user the configured server is unreachable.
+3. If storage.active is remote and doctor reports `remote.health` failure, rerun `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status` once with elevated/unrestricted shell permission before telling the user the configured server is unreachable.
 
 If argument is "remote status":
-1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status`
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status`. If it fails with a connection, DNS, timeout, or sandbox/network error, rerun it once with elevated/unrestricted shell permission.
 2. Show whether `storage.active` is `sqlite` or `remote`, and whether the remote server is reachable.
 
 If argument starts with "remote configure" (e.g. "remote configure http://127.0.0.1:8787"):

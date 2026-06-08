@@ -20,6 +20,7 @@ description: Cross-agent messaging via local SQLite by default, with optional re
 - Local and Worktree modes can use the local SQLite store when the skill's `db/` and `teams/` directories are writable.
 - Cloud mode cannot rely on this machine's local skill database. Use remote storage when Cloud needs shared agmsg state.
 - Codex supports `turn` and `off` delivery only. Do not offer `monitor` or `both`.
+- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, or `history` fails in remote mode with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
 - To diagnose installation, sandbox, and delivery issues, run:
 
 ```bash

@@ -29,6 +29,7 @@ teardown() {
   [ -x "$SK/scripts/agmsgd.mjs" ]
   grep -q 'doctor.sh --porcelain codex "$(pwd)"' "$SK/SKILL.md"
   grep -q 'remote.sh status' "$SK/SKILL.md"
+  grep -q 'elevated/unrestricted shell permission' "$SK/SKILL.md"
 
   # End-to-end through the installed scripts — a missing sourced helper would
   # surface here, not just as a stat on a file.

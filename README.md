@@ -216,6 +216,12 @@ when the installed skill's `db/` and `teams/` directories are writable by the
 sandbox. Cloud mode cannot use this machine's local SQLite file directly; use
 the optional remote server mode when Cloud needs shared storage.
 
+When remote mode is active, Codex app/CLI may still block localhost or LAN HTTP
+from sandboxed shell commands. If `$agmsg doctor`, `$agmsg remote status`,
+`send`, `inbox`, or `history` reports a connection failure while Terminal
+`curl` works, rerun the agmsg script with elevated/unrestricted shell approval
+before treating the server as unreachable.
+
 See [Codex App Guide](docs/codex-app.md) for Local/Worktree/Cloud support and
 the manual acceptance checklist.
 
@@ -276,6 +282,11 @@ AGMSG_REMOTE_URL=http://127.0.0.1:8787 \
 For anything beyond localhost, put it behind SSH forwarding, VPN, or a real
 authenticated reverse proxy. Do not expose an unauthenticated agmsgd directly
 to the public internet.
+
+Codex app/CLI sandboxes can block localhost or LAN HTTP even when the server is
+healthy. If `remote.sh status` fails inside Codex but `curl
+http://<host>:8787/api/v1/health` works in Terminal, rerun the same agmsg
+command with elevated/unrestricted shell approval.
 
 ## Update
 
