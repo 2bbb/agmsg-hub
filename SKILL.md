@@ -54,6 +54,7 @@ Do NOT manually edit config files. Always use join.sh.
 ```bash
 # Check inbox (marks messages as read) — DEFAULT action
 ~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh <team> <agent_id>
+~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2
 
 # Send a message
 ~/.agents/skills/__SKILL_NAME__/scripts/send.sh <team> <from_agent> <to_agent> "<message>"

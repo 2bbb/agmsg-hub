@@ -207,6 +207,7 @@ The command updates `db/config.yaml`, rewrites the project's hook entries, and p
 $agmsg                          — or /skills → agmsg
 $agmsg doctor                   — diagnose Codex app setup
 $agmsg doctor fix               — explicitly add missing Codex writable_roots
+$agmsg wait [seconds]           — poll inbox for a short wait window
 ```
 
 Codex supports `mode turn` and `mode off` only — there's no Monitor tool to stream into.
@@ -242,6 +243,7 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 ```bash
 ~/.agents/skills/<cmd>/scripts/send.sh <team> <from> <to> "<message>"
 ~/.agents/skills/<cmd>/scripts/inbox.sh <team> <agent_id>
+~/.agents/skills/<cmd>/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2
 ~/.agents/skills/<cmd>/scripts/history.sh <team> [agent_id] [limit]
 ~/.agents/skills/<cmd>/scripts/team.sh <team>
 ~/.agents/skills/<cmd>/scripts/whoami.sh <project_path> <type>

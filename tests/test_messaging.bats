@@ -63,6 +63,28 @@ teardown() {
   [[ "$output" =~ "ping" ]]
 }
 
+@test "inbox: --wait times out when no message arrives" {
+  run bash "$SCRIPTS/inbox.sh" testteam alice --wait 1 --poll 1
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Waiting up to 1s" ]]
+  [[ "$output" =~ "No new messages after 1s" ]]
+}
+
+@test "inbox: --wait receives a message that arrives later" {
+  (
+    sleep 1
+    bash "$SCRIPTS/send.sh" testteam alice bob "delayed hello" >/dev/null
+  ) &
+  local sender_pid=$!
+
+  run bash "$SCRIPTS/inbox.sh" testteam bob --wait 5 --poll 1
+  wait "$sender_pid" 2>/dev/null || true
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "delayed hello" ]]
+  [[ "$output" =~ "alice" ]]
+}
+
 @test "inbox: handles multiline message body" {
   bash "$SCRIPTS/send.sh" testteam alice bob "line1
 line2

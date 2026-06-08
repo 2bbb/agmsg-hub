@@ -98,3 +98,19 @@ wait_for_http() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Switched storage.active = sqlite" ]]
 }
+
+@test "remote storage: inbox --wait receives a later message" {
+  (
+    sleep 1
+    AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+      bash "$SCRIPTS/send.sh" testteam alice bob "remote delayed" >/dev/null
+  ) &
+  local sender_pid=$!
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/inbox.sh" testteam bob --wait 5 --poll 1
+  wait "$sender_pid" 2>/dev/null || true
+
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "remote delayed" ]]
+}

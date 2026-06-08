@@ -46,6 +46,7 @@ Four possible outputs:
 
   > **Joined!** You can now use `$__SKILL_NAME__` to check and send messages.
   > - `$__SKILL_NAME__` — check inbox
+  > - `$__SKILL_NAME__ wait` — wait briefly for incoming messages
   > - `$__SKILL_NAME__ send <agent> <message>` — send a message
   > - `$__SKILL_NAME__ team` — list team members
   > - `$__SKILL_NAME__ history` — message history
@@ -98,6 +99,13 @@ If argument is "history":
 
 If argument is "team":
 1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/team.sh $TEAM`
+
+If argument is "wait" or starts with "wait" (e.g. "wait" or "wait 120"):
+1. Parse an optional wait duration in seconds. Default to `60`. Reject non-numeric values.
+2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT --wait <seconds> --poll 2`
+3. If messages arrive, read and respond appropriately. To reply:
+   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
+4. If no messages arrive before the timeout, say that no messages arrived during the wait window.
 
 If argument starts with "send" (e.g. "send misaki check the server"):
 1. Parse target agent and message from the arguments
