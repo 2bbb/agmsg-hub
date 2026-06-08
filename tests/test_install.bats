@@ -57,6 +57,17 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+@test "install: --update installs when no prior agmsg install exists" {
+  HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --update --agent-type codex
+  [ -f "$SK/.agmsg" ]
+  [ -f "$SK/SKILL.md" ]
+  [ -x "$SK/scripts/doctor.sh" ]
+  grep -q 'whoami.sh "$(pwd)" codex' "$SK/SKILL.md"
+
+  run bash "$SK/scripts/doctor.sh" shell /tmp/install-update-first
+  [ "$status" -eq 0 ]
+}
+
 @test "install: AGMSG_STORAGE_PATH override works against the installed skill" {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --cmd agmsg
   local store="$FAKE_HOME/override-store"

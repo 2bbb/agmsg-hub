@@ -7,12 +7,13 @@ set -euo pipefail
 # Usage:
 #   ./install.sh                    # Interactive (asks command name only)
 #   ./install.sh --cmd m            # Non-interactive
-#   ./install.sh --update           # Update scripts in place
+#   ./install.sh --update           # Update scripts in place, or install if missing
 #
 # Options:
 #   --cmd <name>        Command & skill folder name (default: agmsg)
 #                       Claude Code: /<cmd>, Codex: $<cmd>
-#   --update            Update skill scripts only (preserve DB and teams)
+#   --update            Update skill scripts only (preserve DB and teams);
+#                       install with --cmd/default name if missing
 #
 # Joining a team is done separately per-project, either by:
 #   - Running /<cmd> in Claude Code (auto-detects if not in a team)
@@ -42,7 +43,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --agent-type <t>  Agent type: claude-code, codex, gemini, antigravity"
       echo "                    Selects which template becomes SKILL.md (matches the"
       echo "                    <type> arg passed to join.sh / whoami.sh)"
-      echo "  --update          Update skill scripts only (preserve DB and teams)"
+      echo "  --update          Update skill scripts only; install if missing"
       echo ""
       echo "After install, join a team per-project:"
       echo "  ~/.agents/skills/<cmd>/scripts/join.sh <team> <name> <type> <project>"
@@ -78,9 +79,15 @@ if [ "$UPDATE_ONLY" = true ]; then
     fi
   done
   if [ -z "$SKILL_DIR" ]; then
-    echo "  ! Not installed. Run ./install.sh first." >&2
-    exit 1
+    CMD_NAME="${CMD_NAME:-agmsg}"
+    INTERACTIVE=false
+    UPDATE_ONLY=false
+    echo "  ~ No existing agmsg install found; installing ~/.agents/skills/$CMD_NAME/ ..."
+    echo ""
   fi
+fi
+
+if [ "$UPDATE_ONLY" = true ]; then
   SKILL_NAME="$(basename "$SKILL_DIR")"
   echo "  Updating $SKILL_NAME..."
   mkdir -p "$SKILL_DIR"/{scripts,templates,db,teams,agents}
