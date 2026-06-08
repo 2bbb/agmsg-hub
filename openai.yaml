@@ -1,5 +1,6 @@
 interface:
   display_name: "agmsg"
+  description: "Cross-agent messaging for Codex and other CLI agents using local SQLite storage."
 
 policy:
   allow_implicit_invocation: true

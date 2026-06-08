@@ -1,6 +1,6 @@
 # Driver Interface Specification
 
-**Status:** draft (epic [#51](https://github.com/fujibee/agmsg/issues/51))
+**Status:** draft (epic [#51](https://github.com/2bbb/agmsg-hub/issues/51))
 **Scope:** axis A — storage. The common protocol sections also apply to axes B (agent) and C (delivery) but their axis-specific functions are out of scope here.
 
 This document defines the contract between agmsg core and a storage driver. It is the authoritative source for what any new driver must implement.

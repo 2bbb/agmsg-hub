@@ -129,7 +129,7 @@ yaml_set() {
 create_default_config() {
   cat > "$CONFIG_FILE" <<'YAML'
 # agmsg configuration
-# https://agmsg.cc/
+# https://github.com/2bbb/agmsg-hub
 #
 # Mode (monitor | turn | both | off) is per-project — derived from each
 # project's .claude/settings.local.json by `delivery.sh status`. There is

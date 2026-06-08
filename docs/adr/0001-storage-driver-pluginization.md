@@ -2,7 +2,7 @@
 
 **Status:** accepted
 **Date:** 2026-05-30
-**Deciders:** @fujibee
+**Deciders:** @2bbb
 
 ## Context
 
@@ -13,7 +13,7 @@ agmsg was scaffolded with a single hard-coded storage layer (SQLite) accessed in
 
 The constraint is that **the default install must remain bash + sqlite3 only** — no new users should be asked to install anything. Anything more capable must be opt-in, with the dependency story handled cleanly.
 
-The same general "swappable driver behind a fixed protocol" shape will eventually apply to per-agent-type runtime adapters (issue [#48](https://github.com/fujibee/agmsg/issues/48)) and to delivery mechanisms (current `monitor`/`turn`/`both`/`off` mode dispatch). This ADR establishes the convention; subsequent ADRs may apply the same convention to the other axes.
+The same general "swappable driver behind a fixed protocol" shape will eventually apply to per-agent-type runtime adapters (issue [#48](https://github.com/2bbb/agmsg-hub/issues/48)) and to delivery mechanisms (current `monitor`/`turn`/`both`/`off` mode dispatch). This ADR establishes the convention; subsequent ADRs may apply the same convention to the other axes.
 
 ## Decision
 
@@ -93,7 +93,7 @@ Vocabulary is **driver** (architectural unit), **plugin** (driver shipped outsid
 
 - Existing sqlite users see no change: zero migration, zero new dependencies.
 - A JSONL+DuckDB driver becomes a small, well-scoped addition rather than a fork of the storage layer.
-- The same protocol can be reused for axis B (agent — issue [#48](https://github.com/fujibee/agmsg/issues/48)) and axis C (delivery — future refactor).
+- The same protocol can be reused for axis B (agent — issue [#48](https://github.com/2bbb/agmsg-hub/issues/48)) and axis C (delivery — future refactor).
 - Failure modes are recoverable by construction: dep-check failures do not switch drivers, conversions only flip at the end, status codes give the host agent enough information to react correctly.
 - Contributors can ship third-party drivers as plugins under `~/.agents/agmsg/plugins/storage/<name>/` without forking the repo.
 
@@ -111,7 +111,7 @@ Vocabulary is **driver** (architectural unit), **plugin** (driver shipped outsid
 
 ## References
 
-- Epic: [#51](https://github.com/fujibee/agmsg/issues/51)
-- Related: [#48](https://github.com/fujibee/agmsg/issues/48) (agent-type driver refactor), [#49](https://github.com/fujibee/agmsg/issues/49) (`AGMSG_STORAGE_PATH` env var)
+- Epic: [#51](https://github.com/2bbb/agmsg-hub/issues/51)
+- Related: [#48](https://github.com/2bbb/agmsg-hub/issues/48) (agent-type driver refactor), [#49](https://github.com/2bbb/agmsg-hub/issues/49) (`AGMSG_STORAGE_PATH` env var)
 - Specification: [`docs/spec/driver-interface.md`](../spec/driver-interface.md)
 - Concept overview: [`ARCHITECTURE.md`](../../ARCHITECTURE.md)

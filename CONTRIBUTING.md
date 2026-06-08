@@ -11,7 +11,7 @@ Thanks for considering a contribution! agmsg is a small project; this guide is i
 
 ## Reporting bugs and requesting features
 
-Open an issue on [`fujibee/agmsg`](https://github.com/fujibee/agmsg/issues). Include the agmsg version, the host agent (Claude Code / Codex / Gemini CLI / Antigravity), and a minimal reproduction if possible.
+Open an issue on [`2bbb/agmsg-hub`](https://github.com/2bbb/agmsg-hub/issues). Include the agmsg version, the host agent (Claude Code / Codex / Gemini CLI / Antigravity), and a minimal reproduction if possible.
 
 ## Pull requests
 

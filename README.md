@@ -1,6 +1,13 @@
-# agmsg
+# agmsg-hub
 
-Cross-agent messaging for CLI AI agents. No daemon, no network, no complexity.
+agmsg-hub is an independent, intentionally divergent fork of
+[fujibee/agmsg](https://github.com/fujibee/agmsg). It keeps respect for agmsg's
+local-first design and agent-to-agent messaging model, but it is not trying to
+remain the upstream/mainline path.
+
+Cross-agent messaging for CLI AI agents. agmsg-hub keeps agmsg's local-first
+CLI workflow while adding Codex app diagnostics and planned optional remote
+sharing. No daemon, no network, no complexity by default.
 
 Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, and any CLI agent can message each other via a shared SQLite database.
 
@@ -16,10 +23,10 @@ In real use it looks like this — Claude Code asking Codex for a code review an
 
 ```bash
 # 1. Install (one-liner)
-bash <(curl -fsSL https://raw.githubusercontent.com/fujibee/agmsg/main/setup.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/2bbb/agmsg-hub/main/setup.sh)
 
 # Or clone first if you want to inspect the code
-git clone https://github.com/fujibee/agmsg.git && cd agmsg && ./install.sh
+git clone https://github.com/2bbb/agmsg-hub.git && cd agmsg-hub && ./install.sh
 
 # 2. Restart Claude Code / Codex / Gemini CLI / Antigravity to pick up the new skill
 
@@ -41,6 +48,12 @@ After setup, your agent handles everything — just talk to it naturally. "Send 
 ./install.sh --cmd m      # Non-interactive with custom command name
 ./install.sh --agent-type gemini  # Install a Gemini-oriented SKILL.md
 ```
+
+agmsg is a Bash + SQLite tool. macOS and Linux are the primary targets.
+Windows native shells are not a supported target for the local SQLite mode yet;
+use WSL or Git Bash with `bash` and `sqlite3` available. Server-backed remote
+mode may improve native Windows ergonomics later, but that mode is not
+implemented yet.
 
 The **command name** determines:
 - Skill folder: `~/.agents/skills/<cmd>/`
@@ -110,7 +123,7 @@ Mechanics:
 - `drop <name>` removes only that role's registration for this project (via `reset.sh`). If the role is no longer registered anywhere, it's also dropped from the team config. If `<name>` was the currently-active role, the watcher is restarted in default mode — no `actas` name filter, so it receives every (team, agent) pair registered for this project that isn't held by another session.
 - Switching is session-scoped state held by the agent. `/clear` or a new session resets back to the multiple-identities picker.
 - **Recovery**: `actas-claim.sh` writes the lock file before the skill TaskStops the old Monitor and launches the new one. If that subsequent dance fails (e.g. TaskStop succeeds but the new Monitor invocation errors out), the lock stays put but the session has no narrowed watcher. Run `/agmsg drop <name>` in this session, or end the session — either releases the lock so peers can pick it up.
-- **Liveness**: a stale lock is reclaimed when its owner session_id no longer maps to any live cc-instance, where "live" is checked via `kill -0`. PID recycling could in theory keep a long-dead session looking alive forever (and starve peers from claiming or reaching its name); this is tracked in [#67](https://github.com/fujibee/agmsg/issues/67) and not addressed in v1.
+- **Liveness**: a stale lock is reclaimed when its owner session_id no longer maps to any live cc-instance, where "live" is checked via `kill -0`. PID recycling could in theory keep a long-dead session looking alive forever (and starve peers from claiming or reaching its name); this is tracked in [#67](https://github.com/2bbb/agmsg-hub/issues/67) and not addressed in v1.
 - **Codex caveat**: on Codex, `$agmsg actas <name>` is **send-side only** for this session. Codex slash commands don't see a stable `session_id`, so they can't claim a peer-visible exclusivity lock — Claude Code peers will still subscribe to `<name>`. The receive side isn't actually narrowed either: `check-inbox.sh` resolves identity through `whoami.sh` (which picks the first registered agent) and has no view of the agent's in-session actas role, so Codex keeps polling whichever pair it would have without actas. The check-inbox lock filter only skips pairs *another* session owns. Treat Codex actas as a from-line override until a Codex session-id story exists. Claude Code's `/agmsg actas` does claim the lock symmetrically and is the path that exercises the full exclusivity model.
 
 #### Subscription model
@@ -193,9 +206,19 @@ The command updates `db/config.yaml`, rewrites the project's hook entries, and p
 
 ```
 $agmsg                          — or /skills → agmsg
+$agmsg doctor                   — diagnose Codex app setup
+$agmsg doctor fix               — explicitly add missing Codex writable_roots
 ```
 
 Codex supports `mode turn` and `mode off` only — there's no Monitor tool to stream into.
+
+In the Codex app, Local and Worktree modes can use agmsg's local SQLite store
+when the installed skill's `db/` and `teams/` directories are writable by the
+sandbox. Cloud mode requires future remote storage and is not supported by
+local SQLite mode yet.
+
+See [Codex App Guide](docs/codex-app.md) for Local/Worktree/Cloud support and
+the manual acceptance checklist.
 
 ### GitHub Copilot CLI
 
@@ -227,7 +250,7 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 ## Update
 
 ```bash
-cd agmsg
+cd agmsg-hub
 git pull
 ./install.sh --update
 ```

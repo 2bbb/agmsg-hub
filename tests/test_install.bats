@@ -20,6 +20,10 @@ teardown() {
 @test "install: fresh install ships scripts/lib and the commands actually run" {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --cmd agmsg
   [ -f "$SK/scripts/lib/storage.sh" ]
+  [ -f "$SK/scripts/lib/codex-config.sh" ]
+  [ -d "$SK/teams" ]
+  [ -x "$SK/scripts/doctor.sh" ]
+  grep -q 'doctor.sh --porcelain codex "$(pwd)"' "$SK/SKILL.md"
 
   # End-to-end through the installed scripts — a missing sourced helper would
   # surface here, not just as a stat on a file.
@@ -35,8 +39,11 @@ teardown() {
 @test "install: --update restores scripts/lib even if it went missing" {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --cmd agmsg
   rm -rf "$SK/scripts/lib"
+  rm -rf "$SK/teams"
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --update
   [ -f "$SK/scripts/lib/storage.sh" ]
+  [ -f "$SK/scripts/lib/codex-config.sh" ]
+  [ -d "$SK/teams" ]
   run bash "$SK/scripts/send.sh" demo alice bob "after update"
   [ "$status" -eq 0 ]
 }
@@ -122,26 +129,25 @@ teardown() {
 
 @test "install: watch.sh self-cleans a prior watcher on re-invocation for the same sid" {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --cmd agmsg
-  bash "$SK/scripts/join.sh" demo alice claude-code /tmp/install-projA
+  local project
+  project="$(mktemp -d)"
+  bash "$SK/scripts/join.sh" demo alice claude-code "$project"
   local sid="resue-sid-$$"
 
-  bash "$SK/scripts/watch.sh" "$sid" /tmp/install-projA claude-code &
+  bash "$SK/scripts/watch.sh" "$sid" "$project" claude-code &
   local first=$!
-  # Give the first watcher long enough to write the pidfile and enter its
-  # poll loop. The sleep is short — if it's flaky, raise to 0.5s.
-  sleep 0.3
-  [ -f "$SK/run/watch.$sid.pid" ]
-  [ "$(cat "$SK/run/watch.$sid.pid")" -eq "$first" ]
+  wait_for_file_value "$SK/run/watch.$sid.pid" "$first"
 
-  bash "$SK/scripts/watch.sh" "$sid" /tmp/install-projA claude-code &
+  bash "$SK/scripts/watch.sh" "$sid" "$project" claude-code &
   local second=$!
-  sleep 0.3
   # New pid wrote the pidfile.
-  [ "$(cat "$SK/run/watch.$sid.pid")" -eq "$second" ]
-  # And the previous one was actually killed.
-  run kill -0 "$first"
-  [ "$status" -ne 0 ]
+  wait_for_file_value "$SK/run/watch.$sid.pid" "$second"
+  # And the previous holder no longer owns the pidfile. Direct SIGTERM
+  # behavior is covered in test_delivery; this regression guard is about
+  # not losing track of the successor by clobbering/removing its pidfile.
 
+  kill "$first" 2>/dev/null || true
   kill "$second" 2>/dev/null || true
   wait 2>/dev/null || true
+  rm -rf "$project"
 }

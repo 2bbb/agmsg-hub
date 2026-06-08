@@ -83,6 +83,7 @@ if [ "$UPDATE_ONLY" = true ]; then
   fi
   SKILL_NAME="$(basename "$SKILL_DIR")"
   echo "  Updating $SKILL_NAME..."
+  mkdir -p "$SKILL_DIR"/{scripts,templates,db,teams,agents}
   if [ -z "$AGENT_TYPE" ]; then
     if grep -q "whoami.sh.*antigravity" "$SKILL_DIR/SKILL.md" 2>/dev/null; then
       AGENT_TYPE="antigravity"
@@ -147,7 +148,7 @@ SKILL_DIR="$AGENTS_DIR/skills/$CMD_NAME"
 
 # --- Install skill ---
 echo "  Installing to ~/.agents/skills/$CMD_NAME/ ..."
-mkdir -p "$SKILL_DIR"/{scripts,templates,db,agents}
+mkdir -p "$SKILL_DIR"/{scripts,templates,db,teams,agents}
 
 # SKILL.md is generated from the agent-specific command template.
 SKILL_TEMPLATE="cmd.codex.md"
@@ -260,5 +261,5 @@ echo "       Antigravity:  \$$CMD_NAME"
 echo "       Copilot CLI:  /$CMD_NAME"
 echo "       It will prompt for team name and agent name on first run."
 echo ""
-echo "  Docs: https://agmsg.cc/"
+echo "  Docs: https://github.com/2bbb/agmsg-hub#readme"
 echo ""

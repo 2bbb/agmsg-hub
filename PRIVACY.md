@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-06-04
 
-This privacy policy describes how the **agmsg** project (the software at https://github.com/fujibee/agmsg, distributed via [agmsg.cc](https://agmsg.cc), the Anthropic / OpenAI / community plugin and skill marketplaces, and the `agmsg` npm package) handles user data.
+This privacy policy describes how the **agmsg** project (the software at https://github.com/2bbb/agmsg-hub, the Anthropic / OpenAI / community plugin and skill marketplaces, and the `agmsg` npm package) handles user data.
 
 In short: **agmsg does not collect, transmit, or share any user data.** Everything stays on the user's machine.
 
@@ -19,7 +19,7 @@ All of the above lives on the user's machine. agmsg has no daemon, no server, an
 
 ## What agmsg does not do
 
-- **No network requests.** The `install.sh` step uses `curl` to fetch the installer itself, and the optional `agmsg.cc` redirect goes through GitHub. After installation, the runtime makes no outbound requests.
+- **No network requests.** The `install.sh` step uses `curl` to fetch the installer itself from GitHub. After installation, the runtime makes no outbound requests.
 - **No telemetry or analytics.** No usage data, error reports, or counts are sent anywhere.
 - **No third-party services.** agmsg integrates with whatever CLI AI agent the user has installed (Claude Code, Codex, Gemini CLI, Copilot CLI, Antigravity, OpenCode); it does not call those agents' backends itself. Anything the user types to one of those agents is governed by that agent's own privacy policy, not by agmsg.
 - **No accounts.** agmsg has no user accounts, no login, no API keys.
@@ -44,17 +44,16 @@ agmsg does not collect data from anyone, including children. The software is a d
 
 ## Changes to this policy
 
-If agmsg ever begins to collect or transmit data, this policy will be updated and the change announced in the project repository's [`CHANGELOG`](https://github.com/fujibee/agmsg/commits/main) or release notes. The current version of this policy lives at:
+If agmsg ever begins to collect or transmit data, this policy will be updated and the change announced in the project repository's [`CHANGELOG`](https://github.com/2bbb/agmsg-hub/commits/main) or release notes. The current version of this policy lives at:
 
-https://github.com/fujibee/agmsg/blob/main/PRIVACY.md
+https://github.com/2bbb/agmsg-hub/blob/main/PRIVACY.md
 
 ## Contact
 
 Questions or concerns about this policy can be raised by:
 
-- Opening an issue at https://github.com/fujibee/agmsg/issues, or
-- Emailing the maintainer at **fujibee@gmail.com**.
+- Opening an issue at https://github.com/2bbb/agmsg-hub/issues.
 
 ## License
 
-The agmsg project itself is MIT-licensed. See [`LICENSE`](https://github.com/fujibee/agmsg/blob/main/LICENSE).
+The agmsg project itself is MIT-licensed. See [`LICENSE`](https://github.com/2bbb/agmsg-hub/blob/main/LICENSE).

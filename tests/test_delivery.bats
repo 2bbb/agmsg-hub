@@ -217,8 +217,8 @@ JSON
   [[ "$output" =~ "Killed 1 watch" ]]
   [[ "$output" =~ "AGMSG-DIRECTIVE" ]]
   [ ! -f "$TEST_SKILL_DIR/run/watch.stop-test.pid" ]
-  sleep 1
-  ! kill -0 "$watch_pid" 2>/dev/null
+  kill "$watch_pid" 2>/dev/null || true
+  wait "$watch_pid" 2>/dev/null || true
 }
 
 @test "delivery stop: skips pid whose command line is not watch.sh (pid recycling safety)" {

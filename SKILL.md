@@ -9,6 +9,25 @@ description: Cross-agent messaging via SQLite. Send messages between Claude Code
 
 ## How to use
 
+## Runtime support
+
+- macOS and Linux are the primary local-mode targets.
+- Windows native shells are not supported yet. Use WSL or Git Bash with `bash` and `sqlite3`.
+- Remote storage is planned but not implemented.
+
+## Codex app notes
+
+- Local and Worktree modes can use the local SQLite store when the skill's `db/` and `teams/` directories are writable.
+- Cloud mode cannot rely on this machine's local skill database. Use local mode for now; remote storage is planned but not implemented.
+- Codex supports `turn` and `off` delivery only. Do not offer `monitor` or `both`.
+- To diagnose installation, sandbox, and delivery issues, run:
+
+```bash
+~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh codex "$(pwd)"
+~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain codex "$(pwd)"
+~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes codex "$(pwd)"
+```
+
 ### Step 1: Check identity
 
 ```bash
@@ -40,6 +59,11 @@ Do NOT manually edit config files. Always use join.sh.
 
 # Message history
 ~/.agents/skills/__SKILL_NAME__/scripts/history.sh <team> [agent_id] [limit]
+
+# Diagnostics
+~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh <type> "$(pwd)"
+~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain <type> "$(pwd)"
+~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes codex "$(pwd)"
 
 # List team members
 ~/.agents/skills/__SKILL_NAME__/scripts/team.sh <team>

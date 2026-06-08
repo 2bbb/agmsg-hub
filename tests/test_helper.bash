@@ -36,3 +36,34 @@ setup_live_owner() {
   mkdir -p "$run_dir"
   echo "$sid" > "$run_dir/cc-instance.$$"
 }
+
+wait_for_file() {
+  local path="$1"
+  local attempts="${2:-30}"
+  local delay="${3:-0.1}"
+
+  while [ "$attempts" -gt 0 ]; do
+    [ -f "$path" ] && return 0
+    sleep "$delay"
+    attempts=$((attempts - 1))
+  done
+
+  return 1
+}
+
+wait_for_file_value() {
+  local path="$1"
+  local expected="$2"
+  local attempts="${3:-30}"
+  local delay="${4:-0.1}"
+
+  while [ "$attempts" -gt 0 ]; do
+    if [ -f "$path" ] && [ "$(cat "$path" 2>/dev/null)" = "$expected" ]; then
+      return 0
+    fi
+    sleep "$delay"
+    attempts=$((attempts - 1))
+  done
+
+  return 1
+}

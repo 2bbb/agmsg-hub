@@ -2,7 +2,7 @@
 
 **Status:** proposed | accepted | superseded by [ADR-XXXX](XXXX-other.md)
 **Date:** YYYY-MM-DD
-**Deciders:** @fujibee
+**Deciders:** @2bbb
 
 ## Context
 

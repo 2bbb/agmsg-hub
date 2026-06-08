@@ -8,7 +8,7 @@ An agent is identified by `(name, team)`. Project path and agent type (claude-co
 
 - An agent can be registered from multiple projects under the same name
 - `whoami.sh` uses project path and type to suggest an identity, but the user can choose any name
-- See [#15](https://github.com/fujibee/agmsg/issues/15) for the ongoing identity redesign
+- See [#15](https://github.com/2bbb/agmsg-hub/issues/15) for the ongoing identity redesign
 
 ## Data Storage
 
@@ -89,7 +89,7 @@ A marker file (`run/.lastcheck-<agent>`) tracks the last check time. Configurabl
 | Feature flag | Not needed | `codex_hooks = true` in `config.toml` |
 | Silent output | exit 0 with no output | JSON `{ "continue": true }` |
 | New messages | `decision: "block"` | `decision: "block"` |
-| UI label | "Stop hook error:" ([#2](https://github.com/fujibee/agmsg/issues/2)) | "warning:" ([#2](https://github.com/fujibee/agmsg/issues/2)) |
+| UI label | "Stop hook error:" ([#2](https://github.com/2bbb/agmsg-hub/issues/2)) | "warning:" ([#2](https://github.com/2bbb/agmsg-hub/issues/2)) |
 
 ## Scripts
 

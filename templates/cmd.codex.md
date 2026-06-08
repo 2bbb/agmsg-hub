@@ -5,6 +5,14 @@ description: Cross-agent messaging via SQLite. Send messages between Claude Code
 
 Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER directly read or edit config files, DB, or team data. There is NO register.sh — use join.sh to join a team.**
 
+## Codex app modes
+
+- Local mode expects Bash and sqlite3. On Windows, use WSL or Git Bash; native Windows shells are not supported yet.
+- Local and Worktree modes can use local SQLite storage if `db/` and `teams/` are writable.
+- Cloud mode cannot access this machine's local agmsg database. Remote storage is planned but not implemented yet.
+- Codex supports `turn` and `off` delivery only. Never offer `monitor` or `both`.
+- If setup fails, run `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh codex "$(pwd)"`. Use `--porcelain` for stable agent-readable diagnostics and `--apply-fixes` only when the user wants to add missing Codex `writable_roots`.
+
 ## Identity
 
 If you already know your AGENT and TEAMS from a previous `$__SKILL_NAME__` call in this session, skip to **Execute** below.
@@ -92,6 +100,26 @@ If argument starts with "send" (e.g. "send misaki check the server"):
 1. Parse target agent and message from the arguments
 2. Determine which team the target agent belongs to, then run:
    `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
+
+If argument is "doctor":
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain codex "$(pwd)"`
+2. Read the tab-separated output:
+   - `check <id> ok <message>` means the check passed.
+   - `check <id> warn <message>` means usable but degraded.
+   - `check <id> fail <message>` means action is needed.
+   - `fix <id> add_codex_writable_root <path> <config>` means the safe repair is to add `<path>` to Codex `writable_roots` in `<config>`.
+   - `summary ok 0 <warnings>` means setup is usable.
+3. Summarize failures first, then warnings. Do not dump every ok line unless the user asks for raw output.
+4. If fix records are present, tell the user they can run `$__SKILL_NAME__ doctor fix` to apply only the missing Codex `writable_roots` entries.
+
+If argument is "doctor raw":
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain codex "$(pwd)"`
+2. Show the raw output.
+
+If argument is "doctor fix" or "doctor apply-fixes":
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes --porcelain codex "$(pwd)"`
+2. Summarize what changed. This command may create or edit the Codex config and writes a `<config>.bak` backup when editing an existing file.
+3. Do not claim remote storage is ready; warnings about Codex Cloud remain expected until remote storage is implemented.
 
 If argument is "config":
 1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/config.sh show`
