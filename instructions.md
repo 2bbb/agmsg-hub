@@ -20,6 +20,8 @@ npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
 
 `--copy` を付ける。agmsg は local mode では skill dir 配下に `db/`, `teams/`, `db/config.yaml` を書くため、symlink/cache 依存にしない方が事故が少ない。
 
+Skills CLI 用の配布物は repo root ではなく `skills/agmsg/` に置いている。`npx skills add` では runtime skill files だけを入れ、`tests/`, `update-working-docs/`, clone-based installer helper は入れない。
+
 clone して確認してから入れる場合:
 
 ```bash

@@ -6,7 +6,7 @@ setup() {
   setup_test_env
   export TEST_PROJECT="$(mktemp -d)"
   mkdir -p "$TEST_SKILL_DIR/agents"
-  cp "$BATS_TEST_DIRNAME/../SKILL.md" "$TEST_SKILL_DIR/SKILL.md"
+  cp "$BATS_TEST_DIRNAME/../skills/agmsg/SKILL.md" "$TEST_SKILL_DIR/SKILL.md"
   cp "$BATS_TEST_DIRNAME/../openai.yaml" "$TEST_SKILL_DIR/agents/openai.yaml"
 }
 

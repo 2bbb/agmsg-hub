@@ -87,16 +87,14 @@ teardown() {
 
 @test "skills cli copy install works without running install.sh" {
   mkdir -p "$SK"
-  (
-    cd "$REPO_ROOT"
-    tar --exclude .git -cf - .
-  ) | (
-    cd "$SK"
-    tar -xf -
-  )
+  cp -RL "$REPO_ROOT/skills/agmsg/." "$SK/"
 
   [ -d "$SK/db" ]
   [ -d "$SK/teams" ]
+  [ ! -d "$SK/tests" ]
+  [ ! -d "$SK/update-working-docs" ]
+  [ ! -f "$SK/install.sh" ]
+  [ ! -f "$SK/setup.sh" ]
   [ -f "$SK/db/.gitkeep" ]
   [ -f "$SK/teams/.gitkeep" ]
   [ -x "$SK/scripts/doctor.sh" ]

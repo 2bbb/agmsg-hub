@@ -56,6 +56,10 @@ Use `skills add`, not `skills install`; the Vercel Skills CLI does not expose an
 `~/.agents/skills/agmsg/`, which is important because agmsg writes local config,
 DB, and team files there unless remote storage is enabled.
 
+The Skills CLI package lives under `skills/agmsg/` so `npx skills add` installs
+only the runtime skill files, not repo-only tests, planning docs, or installer
+helpers.
+
 Clone-based install is still available when you want to inspect the code first,
 choose a custom command name, or install agent-specific command templates:
 
