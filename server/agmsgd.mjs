@@ -149,6 +149,35 @@ const WEB_UI_HTML = `<!doctype html>
       margin: 0 0 10px;
       letter-spacing: 0;
     }
+    .panel-header h2 {
+      margin: 0;
+    }
+    .panel-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .history-controls {
+      display: flex;
+      align-items: end;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .history-controls label {
+      min-width: 104px;
+    }
+    .history-controls select {
+      width: auto;
+      height: 36px;
+      padding: 6px 8px;
+    }
+    .history-controls button {
+      height: 36px;
+    }
     .team-list {
       display: grid;
       gap: 6px;
@@ -232,6 +261,8 @@ const WEB_UI_HTML = `<!doctype html>
       main { padding: 12px; }
       .topbar { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
+      .panel-header { align-items: stretch; }
+      .history-controls { justify-content: flex-start; }
     }
   </style>
 </head>
@@ -262,7 +293,21 @@ const WEB_UI_HTML = `<!doctype html>
     </section>
     <section id="workspace-view" class="stack">
       <div class="panel" id="history-panel">
-        <h2>History</h2>
+        <div class="panel-header">
+          <h2>History</h2>
+          <div class="history-controls">
+            <label>Per page
+              <select id="history-limit">
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <button id="history-prev" type="button">Prev</button>
+            <span id="history-page" class="status">0-0 of 0</span>
+            <button id="history-next" type="button">Next</button>
+          </div>
+        </div>
         <div id="messages" class="messages"></div>
       </div>
       <div class="panel" id="send-panel">
@@ -305,7 +350,15 @@ const WEB_UI_HTML = `<!doctype html>
     </section>
   </main>
   <script>
-    const state = { projects: [], members: [], selectedProject: null, selectedAgent: "" };
+    const state = {
+      projects: [],
+      members: [],
+      selectedProject: null,
+      selectedAgent: "",
+      historyLimit: 20,
+      historyOffset: 0,
+      historyTotal: 0,
+    };
     const els = {
       health: document.querySelector("#health"),
       refresh: document.querySelector("#refresh"),
@@ -317,6 +370,10 @@ const WEB_UI_HTML = `<!doctype html>
       instruction: document.querySelector("#instruction"),
       instructionStatus: document.querySelector("#instruction-status"),
       messages: document.querySelector("#messages"),
+      historyLimit: document.querySelector("#history-limit"),
+      historyPrev: document.querySelector("#history-prev"),
+      historyNext: document.querySelector("#history-next"),
+      historyPage: document.querySelector("#history-page"),
       form: document.querySelector("#send-form"),
       from: document.querySelector("#from"),
       to: document.querySelector("#to"),
@@ -435,6 +492,22 @@ const WEB_UI_HTML = `<!doctype html>
       } catch (error) {
         setHealth(error.message, "error");
       }
+    }
+
+    function renderHistoryPager() {
+      const total = state.historyTotal;
+      const start = total === 0 ? 0 : state.historyOffset + 1;
+      const end = Math.min(state.historyOffset + state.historyLimit, total);
+      els.historyPage.textContent = start + "-" + end + " of " + total;
+      els.historyPrev.disabled = state.historyOffset <= 0;
+      els.historyNext.disabled = state.historyOffset + state.historyLimit >= total;
+      els.historyLimit.value = String(state.historyLimit);
+    }
+
+    function resetHistoryPage() {
+      state.historyOffset = 0;
+      state.historyTotal = 0;
+      renderHistoryPager();
     }
 
     async function loadProjects(archived = false) {
@@ -603,6 +676,8 @@ const WEB_UI_HTML = `<!doctype html>
       els.messages.replaceChildren();
       const team = selectedTeam();
       if (!allMode && !team) {
+        state.historyTotal = 0;
+        renderHistoryPager();
         const empty = document.createElement("div");
         empty.className = "empty";
         empty.textContent = "No messages";
@@ -610,7 +685,8 @@ const WEB_UI_HTML = `<!doctype html>
         return;
       }
       const params = new URLSearchParams();
-      params.set("limit", "100");
+      params.set("limit", String(state.historyLimit));
+      params.set("offset", String(state.historyOffset));
       if (!allMode) {
         params.set("team", team);
         if (state.selectedProject?.project_id) {
@@ -619,6 +695,10 @@ const WEB_UI_HTML = `<!doctype html>
       }
       const data = await api("/api/v1/messages/history?" + params.toString());
       const messages = data.messages || [];
+      state.historyLimit = data.limit || state.historyLimit;
+      state.historyOffset = data.offset || 0;
+      state.historyTotal = data.total || 0;
+      renderHistoryPager();
       if (messages.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty";
@@ -692,7 +772,22 @@ const WEB_UI_HTML = `<!doctype html>
     els.project.addEventListener("change", async () => {
       state.selectedProject = state.projects.find((project) => projectIdentity(project) === els.project.value) || null;
       state.selectedAgent = "";
+      resetHistoryPage();
       await refreshSelected();
+    });
+    els.historyLimit.addEventListener("change", async () => {
+      state.historyLimit = Number.parseInt(els.historyLimit.value, 10) || 20;
+      resetHistoryPage();
+      await loadHistory();
+    });
+    els.historyPrev.addEventListener("click", async () => {
+      state.historyOffset = Math.max(0, state.historyOffset - state.historyLimit);
+      await loadHistory();
+    });
+    els.historyNext.addEventListener("click", async () => {
+      if (state.historyOffset + state.historyLimit >= state.historyTotal) return;
+      state.historyOffset += state.historyLimit;
+      await loadHistory();
     });
     els.instructionForm.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -735,6 +830,7 @@ const WEB_UI_HTML = `<!doctype html>
         });
         els.body.value = "";
         els.sendStatus.textContent = "Sent";
+        resetHistoryPage();
         await refreshAll();
       } catch (error) {
         els.sendStatus.textContent = error.message;
@@ -1029,6 +1125,14 @@ function intParam(value, fallback) {
   return Math.max(1, Math.min(parsed, 500));
 }
 
+function offsetParam(value) {
+  const parsed = Number.parseInt(value || '', 10);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+  return Math.max(0, parsed);
+}
+
 function createHandler({ db, token, verbose }) {
   return async function handler(req, res) {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -1236,6 +1340,7 @@ function handleHistory(url, res, db) {
   const clientId = url.searchParams.get('client_id') || '';
   const projectId = url.searchParams.get('project_id') || '';
   const limit = intParam(url.searchParams.get('limit'), 20);
+  const offset = offsetParam(url.searchParams.get('offset'));
 
   const conditions = [];
   const params = [];
@@ -1252,6 +1357,14 @@ function handleHistory(url, res, db) {
     params.push(projectId);
   }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const total = db.prepare(`
+    SELECT COUNT(*) AS total
+    FROM messages m
+    ${where}
+  `).get(...params).total;
+  const effectiveOffset = total > 0
+    ? Math.min(offset, Math.floor((total - 1) / limit) * limit)
+    : 0;
 
   const rows = clientId
     ? db.prepare(`
@@ -1263,18 +1376,25 @@ function handleHistory(url, res, db) {
          AND mr.client_id = ?
         ${where}
         ORDER BY m.created_at DESC, m.id DESC
-        LIMIT ?
-      `).all(clientId, ...params, limit)
+        LIMIT ? OFFSET ?
+      `).all(clientId, ...params, limit, effectiveOffset)
     : db.prepare(`
         SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, m.read_at,
                m.project_id, m.project_key, m.project_path, m.from_client_id
         FROM messages m
         ${where}
         ORDER BY m.created_at DESC, m.id DESC
-        LIMIT ?
-      `).all(...params, limit);
+        LIMIT ? OFFSET ?
+      `).all(...params, limit, effectiveOffset);
 
-  jsonResponse(res, 200, { messages: rows.reverse().map(messageRow) });
+  jsonResponse(res, 200, {
+    messages: rows.reverse().map(messageRow),
+    total,
+    limit,
+    offset: effectiveOffset,
+    has_prev: effectiveOffset > 0,
+    has_next: effectiveOffset + limit < total,
+  });
 }
 
 async function handleJoin(req, res, db) {

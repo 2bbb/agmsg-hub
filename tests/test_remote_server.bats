@@ -61,6 +61,9 @@ wait_for_http() {
   [[ "$output" =~ 'id="archive-project"' ]]
   [[ "$output" =~ "/api/v1/role-instructions" ]]
   [[ "$output" =~ "History" ]]
+  [[ "$output" =~ 'id="history-limit"' ]]
+  [[ "$output" =~ 'id="history-prev"' ]]
+  [[ "$output" =~ 'id="history-next"' ]]
   [[ "$output" =~ "Send" ]]
   [[ "$output" =~ "Actas" ]]
   [[ "$output" =~ "Clients" ]]
@@ -98,6 +101,38 @@ wait_for_http() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "alice → bob: hello remote" ]]
   [[ "$output" =~ "○" ]]
+}
+
+@test "remote storage: history supports limit and offset pagination" {
+  for n in 1 2 3 4 5; do
+    run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+      bash "$SCRIPTS/send.sh" testteam alice bob "page message $n"
+    [ "$status" -eq 0 ]
+  done
+
+  run curl -fsS -G "$SERVER_URL/api/v1/messages/history" \
+    --data-urlencode team=testteam \
+    --data-urlencode limit=2 \
+    --data-urlencode offset=0
+  [ "$status" -eq 0 ]
+  JSON="$output" node -e '
+    const data = JSON.parse(process.env.JSON);
+    if (data.total !== 5 || data.limit !== 2 || data.offset !== 0 || data.has_prev !== false || data.has_next !== true) process.exit(1);
+    const bodies = data.messages.map((message) => message.body);
+    if (bodies.join("|") !== "page message 4|page message 5") process.exit(1);
+  '
+
+  run curl -fsS -G "$SERVER_URL/api/v1/messages/history" \
+    --data-urlencode team=testteam \
+    --data-urlencode limit=2 \
+    --data-urlencode offset=2
+  [ "$status" -eq 0 ]
+  JSON="$output" node -e '
+    const data = JSON.parse(process.env.JSON);
+    if (data.total !== 5 || data.limit !== 2 || data.offset !== 2 || data.has_prev !== true || data.has_next !== true) process.exit(1);
+    const bodies = data.messages.map((message) => message.body);
+    if (bodies.join("|") !== "page message 2|page message 3") process.exit(1);
+  '
 }
 
 @test "remote storage: read receipts are scoped to client id" {
