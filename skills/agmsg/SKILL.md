@@ -102,6 +102,8 @@ Messages returned by `inbox.sh`, `history.sh`, `watch.sh`, or remote HTTP storag
 ~/.agents/skills/agmsg/scripts/role-instructions.sh get <team> <agent>
 ~/.agents/skills/agmsg/scripts/role-instructions.sh set <team> <agent> "<instruction>"
 ~/.agents/skills/agmsg/scripts/role-instructions.sh set <team> <agent> --file role.md
+# Command templates also expose `$agmsg instruction update` / `/agmsg instruction update`,
+# which drafts a concise instruction from the current role/session context and saves it.
 
 # Leave a team
 ~/.agents/skills/agmsg/scripts/leave.sh <team> <agent_id>

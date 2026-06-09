@@ -96,6 +96,21 @@ curl -fsS http://<server-host>.local:8787/api/v1/health
 
 `--host 0.0.0.0` は listen 用。client の URL には `0.0.0.0` を使わない。client は `127.0.0.1` か `<server-host>.local` を使う。
 
+同一 machine で port だけ変えて複数 server を立てた場合、デフォルトでは全部同じ DB を見る:
+
+```bash
+./server/server.sh serve --host 127.0.0.1 --port 8787
+./server/server.sh serve --host 127.0.0.1 --port 8788
+```
+
+どちらも `~/.agmsg-hub/db/messages.db` を使う。つまり別 hub ではなく、同じ hub への別入口になる。SQLite WAL なので複数 process から読めるが、書き込みは SQLite の single-writer 制約に従う。
+
+別 DB / 別 hub にしたい場合だけ明示する:
+
+```bash
+./server/server.sh serve --host 127.0.0.1 --port 8788 --db ~/.agmsg-hub-alt/db/messages.db
+```
+
 ## Browser UI
 
 `agmsgd` は同じ port で簡易 dashboard も出す。
@@ -115,13 +130,12 @@ http://<server-host>.local:8787/
 できること:
 
 - health の確認
-- team 一覧
-- team member 一覧
-- role instruction の設定/変更
 - message history の確認
 - test message の送信
+- actas 一覧
+- role instruction の設定/変更
 
-`server.sh serve --token <token>` で bearer token を設定している場合、dashboard 左上の `Bearer token` に同じ token を入れる。HTML 自体は開けるが、API 呼び出しは token なしでは 401 になる。
+上部には project 選択と bearer token 入力が並ぶ。`server.sh serve --token <token>` で bearer token を設定している場合、dashboard 上部の `Bearer token` に同じ token を入れる。HTML 自体は開けるが、API 呼び出しは token なしでは 401 になる。
 
 この UI は現時点では local/LAN の debug/admin 用。未認証のまま public internet に直接出さない。
 

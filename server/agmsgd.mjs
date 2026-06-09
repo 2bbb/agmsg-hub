@@ -54,18 +54,11 @@ const WEB_UI_HTML = `<!doctype html>
     }
     h1 { font-size: 18px; margin: 0; letter-spacing: 0; }
     main {
-      display: grid;
-      grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
-      gap: 0;
-      min-height: calc(100vh - 57px);
-    }
-    aside {
-      border-right: 1px solid var(--line);
-      padding: 16px;
-      overflow: auto;
+      width: min(1280px, 100%);
+      margin: 0 auto;
+      padding: 16px 20px 28px;
     }
     section {
-      padding: 16px 20px;
       overflow: auto;
     }
     .toolbar {
@@ -112,6 +105,24 @@ const WEB_UI_HTML = `<!doctype html>
     }
     .stack { display: grid; gap: 12px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(180px, 260px) auto auto;
+      align-items: end;
+      gap: 10px;
+    }
+    .topbar label {
+      min-width: 0;
+    }
+    .topbar input,
+    .topbar select {
+      height: 36px;
+      padding: 6px 8px;
+    }
+    .topbar .status {
+      align-self: center;
+      white-space: nowrap;
+    }
     .panel {
       border: 1px solid var(--line);
       background: var(--panel);
@@ -203,8 +214,8 @@ const WEB_UI_HTML = `<!doctype html>
       overflow-wrap: anywhere;
     }
     @media (max-width: 760px) {
-      main { grid-template-columns: 1fr; }
-      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      main { padding: 12px; }
+      .topbar { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
     }
   </style>
@@ -212,38 +223,22 @@ const WEB_UI_HTML = `<!doctype html>
 <body>
   <header>
     <h1>agmsgd</h1>
-    <div class="toolbar">
-      <span id="health" class="status">Checking...</span>
-      <button id="refresh">Refresh</button>
-    </div>
   </header>
-  <main>
-    <aside class="stack">
+  <main class="stack">
+    <div class="panel topbar">
+      <label>Project
+        <select id="project"></select>
+      </label>
       <label>Bearer token
         <input id="token" type="password" autocomplete="off">
       </label>
-      <div class="panel">
-        <h2>Teams</h2>
-        <div id="teams" class="team-list"></div>
-      </div>
-    </aside>
+      <span id="health" class="status">Checking...</span>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
     <section class="stack">
       <div class="panel">
-        <h2 id="team-title">No team selected</h2>
-        <div id="members" class="empty"></div>
-      </div>
-      <div class="panel">
-        <h2>Role Instruction</h2>
-        <form id="instruction-form" class="stack">
-          <div id="instruction-target" class="status">No role selected</div>
-          <label>Instruction
-            <textarea id="instruction"></textarea>
-          </label>
-          <div class="toolbar">
-            <button class="primary" type="submit">Save</button>
-            <span id="instruction-status" class="status"></span>
-          </div>
-        </form>
+        <h2>History</h2>
+        <div id="messages" class="messages"></div>
       </div>
       <div class="panel">
         <h2>Send</h2>
@@ -266,19 +261,31 @@ const WEB_UI_HTML = `<!doctype html>
         </form>
       </div>
       <div class="panel">
-        <h2>History</h2>
-        <div id="messages" class="messages"></div>
+        <h2>Actas</h2>
+        <div id="members" class="empty"></div>
+      </div>
+      <div class="panel">
+        <h2>Role Instruction</h2>
+        <form id="instruction-form" class="stack">
+          <div id="instruction-target" class="status">No role selected</div>
+          <label>Instruction
+            <textarea id="instruction"></textarea>
+          </label>
+          <div class="toolbar">
+            <button class="primary" type="submit">Save</button>
+            <span id="instruction-status" class="status"></span>
+          </div>
+        </form>
       </div>
     </section>
   </main>
   <script>
-    const state = { teams: [], members: [], selectedTeam: "", selectedAgent: "" };
+    const state = { projects: [], members: [], selectedProject: null, selectedAgent: "" };
     const els = {
       health: document.querySelector("#health"),
       refresh: document.querySelector("#refresh"),
       token: document.querySelector("#token"),
-      teams: document.querySelector("#teams"),
-      teamTitle: document.querySelector("#team-title"),
+      project: document.querySelector("#project"),
       members: document.querySelector("#members"),
       instructionForm: document.querySelector("#instruction-form"),
       instructionTarget: document.querySelector("#instruction-target"),
@@ -322,6 +329,34 @@ const WEB_UI_HTML = `<!doctype html>
       return String(value ?? "");
     }
 
+    function selectedTeam() {
+      return state.selectedProject?.team || "";
+    }
+
+    function projectIdentity(project) {
+      return project ? project.team + "\\t" + project.project_id : "";
+    }
+
+    function basename(value) {
+      const clean = String(value || "").replace(/[/#]+$/, "");
+      const parts = clean.split(/[/:]+/).filter(Boolean);
+      return parts[parts.length - 1] || clean || "project";
+    }
+
+    function projectLabel(project) {
+      if (!project) return "No project";
+      const key = project.project_key || "";
+      const name = key.startsWith("git:") ? basename(key.slice(4)).replace(/\\.git$/, "") : basename(project.project_path);
+      const clients = project.clients ? " · " + project.clients : "";
+      return name + " · " + project.team + " · " + project.roles + " actas" + clients;
+    }
+
+    function matchesSelectedProject(client) {
+      if (!state.selectedProject) return false;
+      const identity = client.project_key || client.project || "";
+      return identity === state.selectedProject.project_id;
+    }
+
     function latestProject(member) {
       const clients = member.clients || [];
       if (clients.length > 0) return clients[clients.length - 1].project || member.project || "";
@@ -359,57 +394,52 @@ const WEB_UI_HTML = `<!doctype html>
       }
     }
 
-    async function loadTeams() {
-      const data = await api("/api/v1/teams");
-      state.teams = data.teams || [];
-      if (!state.selectedTeam && state.teams.length > 0) {
-        state.selectedTeam = state.teams[0].name;
-      }
-      renderTeams();
+    async function loadProjects() {
+      const previous = projectIdentity(state.selectedProject);
+      const data = await api("/api/v1/projects");
+      state.projects = data.projects || [];
+      state.selectedProject = state.projects.find((project) => projectIdentity(project) === previous) || state.projects[0] || null;
+      renderProjects();
     }
 
-    function renderTeams() {
-      els.teams.replaceChildren();
-      if (state.teams.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "No teams";
-        els.teams.append(empty);
+    function renderProjects() {
+      els.project.replaceChildren();
+      if (state.projects.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No projects";
+        els.project.append(option);
+        els.project.disabled = true;
         return;
       }
-      for (const team of state.teams) {
-        const button = document.createElement("button");
-        button.className = "team-button";
-        button.type = "button";
-        button.setAttribute("aria-current", team.name === state.selectedTeam ? "true" : "false");
-        button.innerHTML = "<span></span><span></span>";
-        button.children[0].textContent = team.name;
-        button.children[1].textContent = team.members;
-        button.addEventListener("click", () => {
-          state.selectedTeam = team.name;
-          refreshSelected();
-        });
-        els.teams.append(button);
+      els.project.disabled = false;
+      for (const project of state.projects) {
+        const option = document.createElement("option");
+        option.value = projectIdentity(project);
+        option.textContent = projectLabel(project);
+        option.selected = projectIdentity(project) === projectIdentity(state.selectedProject);
+        els.project.append(option);
       }
     }
 
     async function loadMembers() {
-      if (!state.selectedTeam) {
-        els.teamTitle.textContent = "No team selected";
+      const team = selectedTeam();
+      if (!team) {
         els.members.className = "empty";
-        els.members.textContent = "No members";
+        els.members.textContent = "No actas";
         state.members = [];
         state.selectedAgent = "";
         renderInstructionEmpty();
         return;
       }
-      els.teamTitle.textContent = state.selectedTeam;
-      const data = await api("/api/v1/teams/members?team=" + encodeURIComponent(state.selectedTeam));
-      const members = data.members || [];
+      const data = await api("/api/v1/teams/members?team=" + encodeURIComponent(team));
+      const members = (data.members || [])
+        .map((member) => ({ ...member, clients: (member.clients || []).filter(matchesSelectedProject) }))
+        .filter((member) => member.clients.length > 0);
       state.members = members;
       if (members.length === 0) {
         els.members.className = "empty";
-        els.members.textContent = "No members";
+        els.members.textContent = "No actas";
         state.selectedAgent = "";
         renderInstructionEmpty();
         return;
@@ -459,14 +489,15 @@ const WEB_UI_HTML = `<!doctype html>
     }
 
     async function loadInstruction() {
-      if (!state.selectedTeam || !state.selectedAgent) {
+      const team = selectedTeam();
+      if (!team || !state.selectedAgent) {
         renderInstructionEmpty();
         return;
       }
-      els.instructionTarget.textContent = state.selectedTeam + " / " + state.selectedAgent;
+      els.instructionTarget.textContent = team + " / " + state.selectedAgent;
       els.instructionStatus.textContent = "";
       const data = await api(
-        "/api/v1/role-instructions?team=" + encodeURIComponent(state.selectedTeam) +
+        "/api/v1/role-instructions?team=" + encodeURIComponent(team) +
         "&agent=" + encodeURIComponent(state.selectedAgent)
       );
       els.instruction.value = data.body || "";
@@ -474,14 +505,15 @@ const WEB_UI_HTML = `<!doctype html>
 
     async function loadHistory() {
       els.messages.replaceChildren();
-      if (!state.selectedTeam) {
+      const team = selectedTeam();
+      if (!team) {
         const empty = document.createElement("div");
         empty.className = "empty";
         empty.textContent = "No messages";
         els.messages.append(empty);
         return;
       }
-      const data = await api("/api/v1/messages/history?team=" + encodeURIComponent(state.selectedTeam) + "&limit=100");
+      const data = await api("/api/v1/messages/history?team=" + encodeURIComponent(team) + "&limit=100");
       const messages = data.messages || [];
       if (messages.length === 0) {
         const empty = document.createElement("div");
@@ -509,7 +541,6 @@ const WEB_UI_HTML = `<!doctype html>
     }
 
     async function refreshSelected() {
-      renderTeams();
       try {
         await loadMembers();
         await Promise.all([loadInstruction(), loadHistory()]);
@@ -521,7 +552,7 @@ const WEB_UI_HTML = `<!doctype html>
     async function refreshAll() {
       await loadHealth();
       try {
-        await loadTeams();
+        await loadProjects();
         await refreshSelected();
       } catch (error) {
         setHealth(error.message, "error");
@@ -530,16 +561,22 @@ const WEB_UI_HTML = `<!doctype html>
 
     els.refresh.addEventListener("click", refreshAll);
     els.token.addEventListener("change", refreshAll);
+    els.project.addEventListener("change", async () => {
+      state.selectedProject = state.projects.find((project) => projectIdentity(project) === els.project.value) || null;
+      state.selectedAgent = "";
+      await refreshSelected();
+    });
     els.instructionForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!state.selectedTeam || !state.selectedAgent) return;
+      const team = selectedTeam();
+      if (!team || !state.selectedAgent) return;
       els.instructionStatus.textContent = "";
       try {
         await api("/api/v1/role-instructions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            team: state.selectedTeam,
+            team,
             agent: state.selectedAgent,
             body: els.instruction.value,
           }),
@@ -551,14 +588,15 @@ const WEB_UI_HTML = `<!doctype html>
     });
     els.form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!state.selectedTeam) return;
+      const team = selectedTeam();
+      if (!team) return;
       els.sendStatus.textContent = "";
       try {
         await api("/api/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            team: state.selectedTeam,
+            team,
             from_agent: els.from.value.trim(),
             to_agent: els.to.value.trim(),
             body: els.body.value,
@@ -864,6 +902,10 @@ function createHandler({ db, token, verbose }) {
       handleTeams(res, db);
       return;
     }
+    if (req.method === 'GET' && url.pathname === '/api/v1/projects') {
+      handleProjects(res, db);
+      return;
+    }
     if (req.method === 'GET' && url.pathname === '/api/v1/teams/members') {
       handleTeamMembers(url, res, db);
       return;
@@ -1052,6 +1094,31 @@ function handleTeams(res, db) {
   `).all();
 
   jsonResponse(res, 200, { teams: rows });
+}
+
+function handleProjects(res, db) {
+  const rows = db.prepare(`
+    SELECT
+      team,
+      COALESCE(NULLIF(project_key, ''), project_path) AS project_id,
+      COALESCE(project_key, '') AS project_key,
+      COALESCE((
+        SELECT r2.project_path
+        FROM registrations r2
+        WHERE r2.team = registrations.team
+          AND COALESCE(NULLIF(r2.project_key, ''), r2.project_path) = COALESCE(NULLIF(registrations.project_key, ''), registrations.project_path)
+        ORDER BY r2.rowid DESC
+        LIMIT 1
+      ), '') AS project_path,
+      COUNT(DISTINCT agent) AS roles,
+      COUNT(*) AS registrations,
+      GROUP_CONCAT(DISTINCT client_label) AS clients
+    FROM registrations
+    GROUP BY team, COALESCE(NULLIF(project_key, ''), project_path)
+    ORDER BY team ASC, project_path ASC
+  `).all();
+
+  jsonResponse(res, 200, { projects: rows });
 }
 
 function handleTeamMembers(url, res, db) {

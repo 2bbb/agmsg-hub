@@ -316,9 +316,24 @@ cd agmsg-hub
 ```
 
 The same server also exposes a small browser dashboard at
-`http://127.0.0.1:8787/` for checking health, teams, members, history, and
-sending test messages. Team members can be selected in the dashboard and their
-role instructions can be edited there.
+`http://127.0.0.1:8787/` for selecting a project, checking history, sending
+test messages, selecting actas roles, and editing role instructions.
+
+By default, every server process uses the same DB resolved by `agmsg_db_path`
+(`~/.agmsg-hub/db/messages.db`, unless `AGMSG_HUB_HOME` or `AGMSG_STORAGE_PATH`
+overrides it). Starting multiple servers on different ports on the same machine
+therefore exposes the same shared state:
+
+```bash
+./server/server.sh serve --host 127.0.0.1 --port 8787
+./server/server.sh serve --host 127.0.0.1 --port 8788
+```
+
+Use an explicit DB path when you actually want isolated hubs:
+
+```bash
+./server/server.sh serve --host 127.0.0.1 --port 8788 --db ~/.agmsg-hub-alt/db/messages.db
+```
 
 Configure each client skill and switch it to the server:
 

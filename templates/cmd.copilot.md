@@ -112,6 +112,13 @@ If argument starts with "instruction set" or "instructions set":
 2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh set $TEAM $AGENT "<instruction>"`
 3. Reload the role instruction for this session.
 
+If argument is "instruction update", "instructions update", "instruction sync", or "instructions sync":
+1. Draft a concise role instruction for the current AGENT from the current session context: actual responsibility, project focus, reporting style, and any durable user preferences that apply to this role.
+2. Do not include secrets, one-off message bodies, transient task status, or anything that conflicts with system/developer instructions or this SKILL.md.
+3. Keep it short enough to be useful as future role guidance.
+4. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh set $TEAM $AGENT "<drafted_instruction>"`
+5. Reload the role instruction for this session and show the saved instruction.
+
 If argument starts with "send" (e.g. "send misaki check the server"):
 1. Parse target agent and message from the arguments
 2. Determine which team the target agent belongs to, then run:

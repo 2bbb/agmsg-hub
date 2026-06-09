@@ -53,9 +53,13 @@ wait_for_http() {
   run curl -fsS "$SERVER_URL/"
   [ "$status" -eq 0 ]
   [[ "$output" =~ "<title>agmsgd</title>" ]]
-  [[ "$output" =~ 'id="teams"' ]]
-  [[ "$output" =~ "/api/v1/teams" ]]
+  [[ "$output" =~ 'id="project"' ]]
+  [[ "$output" =~ "Bearer token" ]]
+  [[ "$output" =~ "/api/v1/projects" ]]
   [[ "$output" =~ "/api/v1/role-instructions" ]]
+  [[ "$output" =~ "History" ]]
+  [[ "$output" =~ "Send" ]]
+  [[ "$output" =~ "Actas" ]]
   [[ "$output" =~ "Clients" ]]
   [[ ! "$output" =~ "Regs" ]]
 }
@@ -141,6 +145,12 @@ wait_for_http() {
   [[ "$output" =~ "suggest=true" ]]
   [[ "$output" =~ "agents=alice,bob" ]]
   [[ "$output" =~ "available_teams=testteam" ]]
+
+  run curl -fsS "$SERVER_URL/api/v1/projects"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"team":"testteam"' ]]
+  [[ "$output" =~ 'remote-proj-a' ]]
+  [[ "$output" =~ 'remote-proj-b' ]]
 }
 
 @test "remote storage: same project path on different clients stays distinct" {
