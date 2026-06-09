@@ -4,12 +4,45 @@
 
 ## 前提
 
-- `install.sh` は **agmsg-hub repo 内**で実行する。
+- 通常の Codex client は `npx skills add` で入れる。`npx skills install` ではない。Vercel Skills CLI のコマンド名は `add`。
+- `install.sh` は clone 済みの **agmsg-hub repo 内**で実行する開発/手動 install 用。
 - `$agmsg` は **Codex で作業する repo 内**で使う。
 - remote server は `agmsgd`。Codex CLI や Codex.app は server ではなく client/agent。
 - remote mode では message DB と team/agent registry が server 側に集まる。local mode では従来通り各 client の `~/.agents/skills/agmsg/teams/` を使う。
 
+## Install
+
+Codex client へ通常 install:
+
+```bash
+npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
+```
+
+`--copy` を付ける。agmsg は local mode では skill dir 配下に `db/`, `teams/`, `db/config.yaml` を書くため、symlink/cache 依存にしない方が事故が少ない。
+
+clone して確認してから入れる場合:
+
+```bash
+git clone https://github.com/2bbb/agmsg-hub.git
+cd agmsg-hub
+./install.sh --agent-type codex
+```
+
+custom command 名が必要な場合は clone-based install を使う:
+
+```bash
+./install.sh --cmd m --agent-type codex
+```
+
 ## 更新
+
+Skills CLI install:
+
+```bash
+npx -y skills@latest update agmsg -g -y
+```
+
+clone-based install:
 
 agmsg-hub repo 側:
 
@@ -26,6 +59,12 @@ git pull
 server 側で `agmsgd` を起動中なら、必要に応じて止めて起動し直す。
 
 ## Server 起動
+
+server machine にも同じ install をしておく:
+
+```bash
+npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
+```
 
 server machine で:
 

@@ -22,10 +22,10 @@ In real use it looks like this — Claude Code asking Codex for a code review an
 ## Quick Start
 
 ```bash
-# 1. Install (one-liner)
-bash <(curl -fsSL https://raw.githubusercontent.com/2bbb/agmsg-hub/main/setup.sh)
+# 1. Install for Codex with the Skills CLI
+npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
 
-# Or clone first if you want to inspect the code
+# Or clone first if you want to inspect the code or use custom command names
 git clone https://github.com/2bbb/agmsg-hub.git && cd agmsg-hub && ./install.sh
 
 # 2. Restart Claude Code / Codex / Gemini CLI / Antigravity to pick up the new skill
@@ -44,6 +44,20 @@ After setup, your agent handles everything — just talk to it naturally. "Send 
 For hands-on Codex, remote server, multi-machine setup, update, and troubleshooting steps, see [Instructions](instructions.md).
 
 ## Install
+
+Recommended for normal Codex clients:
+
+```bash
+npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
+```
+
+Use `skills add`, not `skills install`; the Vercel Skills CLI does not expose an
+`install` command. `--copy` keeps the installed skill self-contained under
+`~/.agents/skills/agmsg/`, which is important because agmsg writes local config,
+DB, and team files there unless remote storage is enabled.
+
+Clone-based install is still available when you want to inspect the code first,
+choose a custom command name, or install agent-specific command templates:
 
 ```bash
 ./install.sh              # Interactive (asks command name, default: agmsg)
@@ -298,6 +312,14 @@ http://<host>:8787/api/v1/health` works in Terminal, rerun the same agmsg
 command with elevated/unrestricted shell approval.
 
 ## Update
+
+Skills CLI install:
+
+```bash
+npx -y skills@latest update agmsg -g -y
+```
+
+Clone-based install:
 
 ```bash
 cd agmsg-hub

@@ -24,15 +24,15 @@ description: Cross-agent messaging via local SQLite by default, with optional re
 - To diagnose installation, sandbox, and delivery issues, run:
 
 ```bash
-~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh codex "$(pwd)"
-~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain codex "$(pwd)"
-~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes codex "$(pwd)"
+~/.agents/skills/agmsg/scripts/doctor.sh codex "$(pwd)"
+~/.agents/skills/agmsg/scripts/doctor.sh --porcelain codex "$(pwd)"
+~/.agents/skills/agmsg/scripts/doctor.sh --apply-fixes codex "$(pwd)"
 ```
 
 ### Step 1: Check identity
 
 ```bash
-~/.agents/skills/__SKILL_NAME__/scripts/whoami.sh "$(pwd)" <type>
+~/.agents/skills/agmsg/scripts/whoami.sh "$(pwd)" <type>
 # type: claude-code, codex, gemini, antigravity, copilot
 # Returns: agent=... / multiple=true ... / suggest=true ... / not_joined=true ...
 ```
@@ -42,7 +42,7 @@ description: Cross-agent messaging via local SQLite by default, with optional re
 Ask the user for a team name and agent name, then run:
 
 ```bash
-~/.agents/skills/__SKILL_NAME__/scripts/join.sh <team> <agent_name> <type> "$(pwd)"
+~/.agents/skills/agmsg/scripts/join.sh <team> <agent_name> <type> "$(pwd)"
 ```
 
 Do NOT manually edit config files. Always use join.sh.
@@ -53,41 +53,41 @@ Do NOT manually edit config files. Always use join.sh.
 
 ```bash
 # Check inbox (marks messages as read) — DEFAULT action
-~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh <team> <agent_id>
-~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2
+~/.agents/skills/agmsg/scripts/inbox.sh <team> <agent_id>
+~/.agents/skills/agmsg/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2
 
 # Send a message
-~/.agents/skills/__SKILL_NAME__/scripts/send.sh <team> <from_agent> <to_agent> "<message>"
+~/.agents/skills/agmsg/scripts/send.sh <team> <from_agent> <to_agent> "<message>"
 
 # Message history
-~/.agents/skills/__SKILL_NAME__/scripts/history.sh <team> [agent_id] [limit]
+~/.agents/skills/agmsg/scripts/history.sh <team> [agent_id] [limit]
 
 # Diagnostics
-~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh <type> "$(pwd)"
-~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain <type> "$(pwd)"
-~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --apply-fixes codex "$(pwd)"
+~/.agents/skills/agmsg/scripts/doctor.sh <type> "$(pwd)"
+~/.agents/skills/agmsg/scripts/doctor.sh --porcelain <type> "$(pwd)"
+~/.agents/skills/agmsg/scripts/doctor.sh --apply-fixes codex "$(pwd)"
 
 # Remote storage MVP
-~/.agents/skills/__SKILL_NAME__/scripts/server.sh serve --host 127.0.0.1 --port 8787
-~/.agents/skills/__SKILL_NAME__/scripts/remote.sh configure http://127.0.0.1:8787
-~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch remote
-~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status
+~/.agents/skills/agmsg/scripts/server.sh serve --host 127.0.0.1 --port 8787
+~/.agents/skills/agmsg/scripts/remote.sh configure http://127.0.0.1:8787
+~/.agents/skills/agmsg/scripts/remote.sh switch remote
+~/.agents/skills/agmsg/scripts/remote.sh status
 
 # List team members
-~/.agents/skills/__SKILL_NAME__/scripts/team.sh <team>
+~/.agents/skills/agmsg/scripts/team.sh <team>
 
 # Leave a team
-~/.agents/skills/__SKILL_NAME__/scripts/leave.sh <team> <agent_id>
+~/.agents/skills/agmsg/scripts/leave.sh <team> <agent_id>
 
 # Rename a team (moves dir, updates config + messages).
 # After renaming, each existing member should re-run whoami.sh to refresh
 # their cached team name in any running session.
-~/.agents/skills/__SKILL_NAME__/scripts/rename-team.sh <old_team> <new_team>
+~/.agents/skills/agmsg/scripts/rename-team.sh <old_team> <new_team>
 
 # Clear registrations for the current project/type.
 # A trailing <session_id> additionally releases any actas exclusivity locks
 # this session held on <agent_id> so peers can pick them up immediately.
-~/.agents/skills/__SKILL_NAME__/scripts/reset.sh "$(pwd)" <type> [agent_id] [session_id]
+~/.agents/skills/agmsg/scripts/reset.sh "$(pwd)" <type> [agent_id] [session_id]
 
 # Set delivery mode for this project. Replaces the legacy hook.sh on/off,
 # which is kept as a deprecated alias only.
@@ -95,8 +95,8 @@ Do NOT manually edit config files. Always use join.sh.
 #   turn    — Stop-hook pulls at the end of each assistant turn
 #   both    — monitor primary, turn as fallback
 #   off     — no automatic delivery
-~/.agents/skills/__SKILL_NAME__/scripts/delivery.sh set <mode> <type> "$(pwd)"
-~/.agents/skills/__SKILL_NAME__/scripts/delivery.sh status <type> "$(pwd)"
+~/.agents/skills/agmsg/scripts/delivery.sh set <mode> <type> "$(pwd)"
+~/.agents/skills/agmsg/scripts/delivery.sh status <type> "$(pwd)"
 
 # Multiple roles per project (one CC = one active role).
 # Claude Code: `actas` claims an exclusivity lock for <name> across sessions
@@ -104,8 +104,8 @@ Do NOT manually edit config files. Always use join.sh.
 # subscribing to <name> while this session holds the lock. `drop` releases.
 # Codex: actas is send-side only (no stable session_id during slash commands
 # → no peer-visible lock). See README "Codex caveat" for details.
-~/.agents/skills/__SKILL_NAME__/scripts/actas-claim.sh "$(pwd)" <type> <name> "$session_id"
-~/.agents/skills/__SKILL_NAME__/scripts/reset.sh "$(pwd)" <type> <name> "$session_id"
+~/.agents/skills/agmsg/scripts/actas-claim.sh "$(pwd)" <type> <name> "$session_id"
+~/.agents/skills/agmsg/scripts/reset.sh "$(pwd)" <type> <name> "$session_id"
 
 # (Both of the above are normally driven by `/agmsg actas <name>` and
 #  `/agmsg drop <name>` slash commands, which also handle the Monitor
@@ -114,8 +114,8 @@ Do NOT manually edit config files. Always use join.sh.
 
 ## Architecture
 
-- **Storage**: SQLite with WAL mode in `~/.agents/skills/__SKILL_NAME__/db/messages.db`
-- **Teams**: `~/.agents/skills/__SKILL_NAME__/teams/<name>/config.json`
+- **Storage**: SQLite with WAL mode in `~/.agents/skills/agmsg/db/messages.db`
+- **Teams**: `~/.agents/skills/agmsg/teams/<name>/config.json`
 - **Concurrency**: WAL allows multiple readers + 1 writer without conflicts
 - **Default mode**: Direct DB access via `sqlite3` CLI; no daemon and no network
 - **Remote mode**: Optional Node.js HTTP server owning a SQLite store

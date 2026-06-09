@@ -127,6 +127,7 @@ yaml_set() {
 }
 
 create_default_config() {
+  mkdir -p "$(dirname "$CONFIG_FILE")"
   cat > "$CONFIG_FILE" <<'YAML'
 # agmsg configuration
 # https://github.com/2bbb/agmsg-hub

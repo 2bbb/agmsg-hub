@@ -80,6 +80,38 @@ teardown() {
   [[ "$output" =~ "via override" ]]
 }
 
+@test "skills cli copy install works without running install.sh" {
+  mkdir -p "$SK"
+  (
+    cd "$REPO_ROOT"
+    tar --exclude .git -cf - .
+  ) | (
+    cd "$SK"
+    tar -xf -
+  )
+
+  [ -d "$SK/db" ]
+  [ -d "$SK/teams" ]
+  [ -f "$SK/db/.gitkeep" ]
+  [ -f "$SK/teams/.gitkeep" ]
+  [ -x "$SK/scripts/doctor.sh" ]
+  [ -x "$SK/scripts/remote.sh" ]
+  [ -x "$SK/scripts/agmsgd.mjs" ]
+  ! grep -q "__SKILL_NAME__" "$SK/SKILL.md"
+  grep -q "~/.agents/skills/agmsg/scripts/whoami.sh" "$SK/SKILL.md"
+
+  run env HOME="$FAKE_HOME" bash "$SK/scripts/remote.sh" configure http://127.0.0.1:8787
+  [ "$status" -eq 0 ]
+  [ -f "$SK/db/config.yaml" ]
+  grep -q "url: http://127.0.0.1:8787" "$SK/db/config.yaml"
+
+  run env HOME="$FAKE_HOME" bash "$SK/scripts/send.sh" demo alice bob "from skills cli copy"
+  [ "$status" -eq 0 ]
+  run env HOME="$FAKE_HOME" bash "$SK/scripts/inbox.sh" demo bob
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "from skills cli copy" ]]
+}
+
 # Regression: actas-claim.sh used to source lib/actas-lock.sh without first
 # setting SKILL_DIR, which made `: "${SKILL_DIR:?...}"` fire and the script
 # die in any fresh-shell invocation. bats tests passed because test_helper
