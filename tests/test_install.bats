@@ -51,6 +51,7 @@ teardown() {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --cmd agmsg
   rm -rf "$SK/scripts/lib"
   touch "$SK/scripts/server.sh" "$SK/scripts/agmsgd.mjs"
+  mkdir -p "$SK/db" "$SK/teams"
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --update
   [ -f "$SK/scripts/lib/storage.sh" ]
   [ -f "$SK/scripts/lib/codex-config.sh" ]
@@ -58,6 +59,8 @@ teardown() {
   [ -x "$SK/scripts/remote.sh" ]
   [ ! -e "$SK/scripts/server.sh" ]
   [ ! -e "$SK/scripts/agmsgd.mjs" ]
+  [ ! -d "$SK/db" ]
+  [ ! -d "$SK/teams" ]
   [ -x "$SK/scripts/role-instructions.sh" ]
   run bash "$SK/scripts/send.sh" demo alice bob "after update"
   [ "$status" -eq 0 ]
