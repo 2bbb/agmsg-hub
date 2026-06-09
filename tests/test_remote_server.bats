@@ -49,6 +49,14 @@ wait_for_http() {
   [[ "$output" =~ '"storage":"sqlite"' ]]
 }
 
+@test "server: root serves browser dashboard" {
+  run curl -fsS "$SERVER_URL/"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "<title>agmsgd</title>" ]]
+  [[ "$output" =~ 'id="teams"' ]]
+  [[ "$output" =~ "/api/v1/teams" ]]
+}
+
 @test "remote storage: env-selected send, inbox, read, and history roundtrip" {
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
     bash "$SCRIPTS/send.sh" testteam alice bob "hello remote"

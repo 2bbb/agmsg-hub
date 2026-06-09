@@ -53,6 +53,34 @@ curl -fsS http://<server-host>.local:8787/api/v1/health
 
 `--host 0.0.0.0` は listen 用。client の URL には `0.0.0.0` を使わない。client は `127.0.0.1` か `<server-host>.local` を使う。
 
+## Browser UI
+
+`agmsgd` は同じ port で簡易 dashboard も出す。
+
+server と同じ machine:
+
+```text
+http://127.0.0.1:8787/
+```
+
+LAN 上の別 machine:
+
+```text
+http://<server-host>.local:8787/
+```
+
+できること:
+
+- health の確認
+- team 一覧
+- team member 一覧
+- message history の確認
+- test message の送信
+
+`server.sh serve --token <token>` で bearer token を設定している場合、dashboard 左上の `Bearer token` に同じ token を入れる。HTML 自体は開けるが、API 呼び出しは token なしでは 401 になる。
+
+この UI は現時点では local/LAN の debug/admin 用。未認証のまま public internet に直接出さない。
+
 ## Client 設定
 
 server と同じ machine 上の client:

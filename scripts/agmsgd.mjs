@@ -6,6 +6,440 @@ import { dirname } from 'node:path';
 
 const API_VERSION = 'v1';
 const SERVER_VERSION = '0.1.0';
+const WEB_UI_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agmsgd</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f4;
+      --fg: #1e2328;
+      --muted: #66707a;
+      --line: #d8ddd8;
+      --panel: #ffffff;
+      --accent: #1463ff;
+      --danger: #b3261e;
+      --ok: #167344;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111315;
+        --fg: #e8eaed;
+        --muted: #a1a8b0;
+        --line: #30363d;
+        --panel: #181b1f;
+        --accent: #7aa2ff;
+        --danger: #ff8a80;
+        --ok: #78d59a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.45;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    h1 { font-size: 18px; margin: 0; letter-spacing: 0; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+      gap: 0;
+      min-height: calc(100vh - 57px);
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      padding: 16px;
+      overflow: auto;
+    }
+    section {
+      padding: 16px 20px;
+      overflow: auto;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .status {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .ok { color: var(--ok); }
+    .error { color: var(--danger); }
+    button, input, textarea, select {
+      font: inherit;
+      color: inherit;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 6px;
+      padding: 8px 9px;
+    }
+    textarea { min-height: 86px; resize: vertical; }
+    label {
+      display: grid;
+      gap: 5px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .stack { display: grid; gap: 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .panel h2 {
+      font-size: 15px;
+      margin: 0 0 10px;
+      letter-spacing: 0;
+    }
+    .team-list {
+      display: grid;
+      gap: 6px;
+    }
+    .team-button {
+      text-align: left;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .team-button[aria-current="true"] {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .messages {
+      display: grid;
+      gap: 8px;
+    }
+    .message {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .message-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .message-body {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .empty {
+      color: var(--muted);
+      font-size: 14px;
+      padding: 10px 0;
+    }
+    @media (max-width: 760px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>agmsgd</h1>
+    <div class="toolbar">
+      <span id="health" class="status">Checking...</span>
+      <button id="refresh">Refresh</button>
+    </div>
+  </header>
+  <main>
+    <aside class="stack">
+      <label>Bearer token
+        <input id="token" type="password" autocomplete="off">
+      </label>
+      <div class="panel">
+        <h2>Teams</h2>
+        <div id="teams" class="team-list"></div>
+      </div>
+    </aside>
+    <section class="stack">
+      <div class="panel">
+        <h2 id="team-title">No team selected</h2>
+        <div id="members" class="empty"></div>
+      </div>
+      <div class="panel">
+        <h2>Send</h2>
+        <form id="send-form" class="stack">
+          <div class="row">
+            <label>From
+              <input id="from" autocomplete="off">
+            </label>
+            <label>To
+              <input id="to" autocomplete="off">
+            </label>
+          </div>
+          <label>Message
+            <textarea id="body"></textarea>
+          </label>
+          <div class="toolbar">
+            <button class="primary" type="submit">Send</button>
+            <span id="send-status" class="status"></span>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>History</h2>
+        <div id="messages" class="messages"></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const state = { teams: [], selectedTeam: "" };
+    const els = {
+      health: document.querySelector("#health"),
+      refresh: document.querySelector("#refresh"),
+      token: document.querySelector("#token"),
+      teams: document.querySelector("#teams"),
+      teamTitle: document.querySelector("#team-title"),
+      members: document.querySelector("#members"),
+      messages: document.querySelector("#messages"),
+      form: document.querySelector("#send-form"),
+      from: document.querySelector("#from"),
+      to: document.querySelector("#to"),
+      body: document.querySelector("#body"),
+      sendStatus: document.querySelector("#send-status"),
+    };
+
+    function headers(extra = {}) {
+      const base = { ...extra };
+      const token = els.token.value.trim();
+      if (token) base.Authorization = "Bearer " + token;
+      return base;
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: headers(options.headers || {}),
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!response.ok) {
+        const message = data.error?.message || response.statusText;
+        throw new Error(message);
+      }
+      return data;
+    }
+
+    function setHealth(text, cls = "") {
+      els.health.className = "status " + cls;
+      els.health.textContent = text;
+    }
+
+    function escapeText(value) {
+      return String(value ?? "");
+    }
+
+    async function loadHealth() {
+      try {
+        const health = await api("/api/v1/health");
+        setHealth("OK " + health.server_version, "ok");
+      } catch (error) {
+        setHealth(error.message, "error");
+      }
+    }
+
+    async function loadTeams() {
+      const data = await api("/api/v1/teams");
+      state.teams = data.teams || [];
+      if (!state.selectedTeam && state.teams.length > 0) {
+        state.selectedTeam = state.teams[0].name;
+      }
+      renderTeams();
+    }
+
+    function renderTeams() {
+      els.teams.replaceChildren();
+      if (state.teams.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No teams";
+        els.teams.append(empty);
+        return;
+      }
+      for (const team of state.teams) {
+        const button = document.createElement("button");
+        button.className = "team-button";
+        button.type = "button";
+        button.setAttribute("aria-current", team.name === state.selectedTeam ? "true" : "false");
+        button.innerHTML = "<span></span><span></span>";
+        button.children[0].textContent = team.name;
+        button.children[1].textContent = team.members;
+        button.addEventListener("click", () => {
+          state.selectedTeam = team.name;
+          refreshSelected();
+        });
+        els.teams.append(button);
+      }
+    }
+
+    async function loadMembers() {
+      if (!state.selectedTeam) {
+        els.teamTitle.textContent = "No team selected";
+        els.members.className = "empty";
+        els.members.textContent = "No members";
+        return;
+      }
+      els.teamTitle.textContent = state.selectedTeam;
+      const data = await api("/api/v1/teams/members?team=" + encodeURIComponent(state.selectedTeam));
+      const members = data.members || [];
+      if (members.length === 0) {
+        els.members.className = "empty";
+        els.members.textContent = "No members";
+        return;
+      }
+      const table = document.createElement("table");
+      table.innerHTML = "<thead><tr><th>Name</th><th>Types</th><th>Project</th><th>Regs</th></tr></thead><tbody></tbody>";
+      for (const member of members) {
+        const tr = document.createElement("tr");
+        for (const value of [member.name, member.types, member.project, member.registrations]) {
+          const td = document.createElement("td");
+          td.textContent = escapeText(value);
+          tr.append(td);
+        }
+        table.querySelector("tbody").append(tr);
+      }
+      els.members.className = "";
+      els.members.replaceChildren(table);
+    }
+
+    async function loadHistory() {
+      els.messages.replaceChildren();
+      if (!state.selectedTeam) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No messages";
+        els.messages.append(empty);
+        return;
+      }
+      const data = await api("/api/v1/messages/history?team=" + encodeURIComponent(state.selectedTeam) + "&limit=100");
+      const messages = data.messages || [];
+      if (messages.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No messages";
+        els.messages.append(empty);
+        return;
+      }
+      for (const message of messages) {
+        const item = document.createElement("article");
+        item.className = "message";
+        const head = document.createElement("div");
+        head.className = "message-head";
+        const route = document.createElement("span");
+        route.textContent = message.from_agent + " -> " + message.to_agent;
+        const time = document.createElement("span");
+        time.textContent = message.created_at + (message.read ? " read" : " unread");
+        const body = document.createElement("div");
+        body.className = "message-body";
+        body.textContent = message.body;
+        head.append(route, time);
+        item.append(head, body);
+        els.messages.append(item);
+      }
+    }
+
+    async function refreshSelected() {
+      renderTeams();
+      try {
+        await Promise.all([loadMembers(), loadHistory()]);
+      } catch (error) {
+        setHealth(error.message, "error");
+      }
+    }
+
+    async function refreshAll() {
+      await loadHealth();
+      try {
+        await loadTeams();
+        await refreshSelected();
+      } catch (error) {
+        setHealth(error.message, "error");
+      }
+    }
+
+    els.refresh.addEventListener("click", refreshAll);
+    els.token.addEventListener("change", refreshAll);
+    els.form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!state.selectedTeam) return;
+      els.sendStatus.textContent = "";
+      try {
+        await api("/api/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            team: state.selectedTeam,
+            from_agent: els.from.value.trim(),
+            to_agent: els.to.value.trim(),
+            body: els.body.value,
+          }),
+        });
+        els.body.value = "";
+        els.sendStatus.textContent = "Sent";
+        await refreshAll();
+      } catch (error) {
+        els.sendStatus.textContent = error.message;
+      }
+    });
+
+    refreshAll();
+  </script>
+</body>
+</html>`;
 
 function parseArgs(argv) {
   const args = {
@@ -108,6 +542,15 @@ function jsonResponse(res, status, payload) {
   res.end(body);
 }
 
+function htmlResponse(res, status, html) {
+  const body = Buffer.from(html, 'utf8');
+  res.writeHead(status, {
+    'content-type': 'text/html; charset=utf-8',
+    'content-length': body.length,
+  });
+  res.end(body);
+}
+
 function errorResponse(res, status, code, message) {
   jsonResponse(res, status, { error: { code, message } });
 }
@@ -164,6 +607,11 @@ function createHandler({ db, token, verbose }) {
     const url = new URL(req.url, 'http://127.0.0.1');
     if (verbose) {
       console.error(`${req.method} ${url.pathname}`);
+    }
+
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+      htmlResponse(res, 200, WEB_UI_HTML);
+      return;
     }
 
     if (req.method === 'GET' && url.pathname === '/api/v1/health') {

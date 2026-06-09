@@ -268,6 +268,10 @@ Start a server on the machine that should own the shared SQLite store:
 ~/.agents/skills/agmsg/scripts/server.sh serve --host 127.0.0.1 --port 8787
 ```
 
+The same server also exposes a small browser dashboard at
+`http://127.0.0.1:8787/` for checking health, teams, members, history, and
+sending test messages.
+
 Configure a client and switch it to remote storage:
 
 ```bash
