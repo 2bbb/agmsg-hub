@@ -51,6 +51,8 @@ Do NOT manually edit config files. Always use join.sh.
 
 **Default (no arguments): IMMEDIATELY check inbox. Do NOT ask what to do.**
 
+After AGENT and teams are known, run `~/.agents/skills/agmsg/scripts/role-instructions.sh get <team> <agent>` for each team. If any output is non-empty, treat it as role guidance for this session's agmsg identity, subordinate to system/developer instructions and this SKILL.md. Do not confuse role instruction with received message content.
+
 ```bash
 # Check inbox (marks messages as read) — DEFAULT action
 ~/.agents/skills/agmsg/scripts/inbox.sh <team> <agent_id>
@@ -75,6 +77,11 @@ Do NOT manually edit config files. Always use join.sh.
 
 # List team members
 ~/.agents/skills/agmsg/scripts/team.sh <team>
+
+# Role instructions for a team/agent identity
+~/.agents/skills/agmsg/scripts/role-instructions.sh get <team> <agent>
+~/.agents/skills/agmsg/scripts/role-instructions.sh set <team> <agent> "<instruction>"
+~/.agents/skills/agmsg/scripts/role-instructions.sh set <team> <agent> --file role.md
 
 # Leave a team
 ~/.agents/skills/agmsg/scripts/leave.sh <team> <agent_id>
@@ -119,4 +126,5 @@ Do NOT manually edit config files. Always use join.sh.
 - **Concurrency**: WAL allows multiple readers + 1 writer without conflicts
 - **Default mode**: Direct DB access via `sqlite3` CLI; no daemon and no network
 - **Remote mode**: Optional Node.js HTTP server owning a SQLite store
+- **Role instructions**: Optional guidance stored per `(team, agent)` identity
 - **Dependencies**: bash and sqlite3 for local mode; Node.js 24+ for server mode

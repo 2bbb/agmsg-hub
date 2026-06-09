@@ -27,10 +27,12 @@ teardown() {
   [ -x "$SK/scripts/server.sh" ]
   [ -x "$SK/scripts/remote.sh" ]
   [ -x "$SK/scripts/agmsgd.mjs" ]
+  [ -x "$SK/scripts/role-instructions.sh" ]
   grep -q 'doctor.sh --porcelain codex "$(pwd)"' "$SK/SKILL.md"
   grep -q 'remote.sh status' "$SK/SKILL.md"
   grep -q 'inbox.sh $TEAM $AGENT --wait <seconds> --poll <poll_seconds>' "$SK/SKILL.md"
   grep -q 'elevated/unrestricted shell permission' "$SK/SKILL.md"
+  grep -q 'role-instructions.sh get <team> $AGENT' "$SK/SKILL.md"
 
   # End-to-end through the installed scripts — a missing sourced helper would
   # surface here, not just as a stat on a file.
@@ -55,6 +57,7 @@ teardown() {
   [ -x "$SK/scripts/server.sh" ]
   [ -x "$SK/scripts/remote.sh" ]
   [ -x "$SK/scripts/agmsgd.mjs" ]
+  [ -x "$SK/scripts/role-instructions.sh" ]
   run bash "$SK/scripts/send.sh" demo alice bob "after update"
   [ "$status" -eq 0 ]
 }
@@ -64,7 +67,9 @@ teardown() {
   [ -f "$SK/.agmsg" ]
   [ -f "$SK/SKILL.md" ]
   [ -x "$SK/scripts/doctor.sh" ]
+  [ -x "$SK/scripts/role-instructions.sh" ]
   grep -q 'whoami.sh "$(pwd)" codex' "$SK/SKILL.md"
+  grep -q 'role-instructions.sh get <team> $AGENT' "$SK/SKILL.md"
 
   run bash "$SK/scripts/doctor.sh" shell /tmp/install-update-first
   [ "$status" -eq 0 ]
@@ -97,8 +102,10 @@ teardown() {
   [ -x "$SK/scripts/doctor.sh" ]
   [ -x "$SK/scripts/remote.sh" ]
   [ -x "$SK/scripts/agmsgd.mjs" ]
+  [ -x "$SK/scripts/role-instructions.sh" ]
   ! grep -q "__SKILL_NAME__" "$SK/SKILL.md"
   grep -q "~/.agents/skills/agmsg/scripts/whoami.sh" "$SK/SKILL.md"
+  grep -q "role-instructions.sh get <team> <agent>" "$SK/SKILL.md"
 
   run env HOME="$FAKE_HOME" bash "$SK/scripts/remote.sh" configure http://127.0.0.1:8787
   [ "$status" -eq 0 ]
@@ -110,6 +117,14 @@ teardown() {
   run env HOME="$FAKE_HOME" bash "$SK/scripts/inbox.sh" demo bob
   [ "$status" -eq 0 ]
   [[ "$output" =~ "from skills cli copy" ]]
+
+  run env HOME="$FAKE_HOME" bash "$SK/scripts/join.sh" demo alice codex /tmp/skills-copy-proj
+  [ "$status" -eq 0 ]
+  run env HOME="$FAKE_HOME" bash "$SK/scripts/role-instructions.sh" set demo alice "Review as Alice."
+  [ "$status" -eq 0 ]
+  run env HOME="$FAKE_HOME" bash "$SK/scripts/role-instructions.sh" get demo alice
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Review as Alice." ]]
 }
 
 # Regression: actas-claim.sh used to source lib/actas-lock.sh without first

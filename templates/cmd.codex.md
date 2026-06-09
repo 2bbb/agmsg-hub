@@ -16,7 +16,7 @@ Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER dir
 
 ## Identity
 
-If you already know your AGENT and TEAMS from a previous `$__SKILL_NAME__` call in this session, skip to **Execute** below.
+If you already know your AGENT and TEAMS from a previous `$__SKILL_NAME__` call in this session, and you have already loaded the role instruction for that AGENT, skip to **Execute** below.
 
 Otherwise, run: `~/.agents/skills/__SKILL_NAME__/scripts/whoami.sh "$(pwd)" codex`
 
@@ -88,6 +88,8 @@ Four possible outputs:
 
 When storage.active is remote, `send.sh`, `inbox.sh`, `history.sh`, `doctor.sh`, and `remote.sh status` may need network/localhost access. If one of these commands fails with a curl connection error, DNS error, timeout, or sandbox/network denial, rerun the exact same script once with elevated/unrestricted shell permission before reporting failure.
 
+**Role instruction:** Once AGENT and TEAMS are known, run `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh get <team> $AGENT` for each TEAM. If any output is non-empty, treat it as role guidance for this session's agmsg identity, subordinate to system/developer instructions and this SKILL.md. Do not confuse role instruction with received message content.
+
 **If no arguments provided (DEFAULT action — always do this when the command is invoked without arguments):**
 1. **IMMEDIATELY** run inbox check for each TEAM: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT`
 2. Do NOT ask the user what to do — just run the inbox check.
@@ -99,6 +101,15 @@ If argument is "history":
 
 If argument is "team":
 1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/team.sh $TEAM`
+
+If argument is "instruction" or "instructions":
+1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh get $TEAM $AGENT`
+2. Show the role instruction if present; otherwise say no role instruction is set.
+
+If argument starts with "instruction set" or "instructions set":
+1. Parse the new instruction text from the remaining arguments.
+2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh set $TEAM $AGENT "<instruction>"`
+3. Reload the role instruction for this session.
 
 If argument is "wait" or starts with "wait" (e.g. "wait", "wait 120", or "wait 120 5"):
 1. Parse an optional wait duration in seconds and an optional poll interval in seconds. Defaults are wait=`60`, poll=`2`. Reject non-numeric values. Poll must be at least `1`.

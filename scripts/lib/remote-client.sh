@@ -50,6 +50,15 @@ agmsg_json_join_payload() {
   sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'type', '$type', 'project', '$project');"
 }
 
+agmsg_json_role_instruction_payload() {
+  local team agent body_file
+  team="$(agmsg_sql_escape "$1")"
+  agent="$(agmsg_sql_escape "$2")"
+  body_file="$3"
+
+  sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'body', CAST(readfile('$(agmsg_sql_escape "$body_file")') AS TEXT));"
+}
+
 agmsg_remote_headers() {
   local token
   token="$(agmsg_remote_token)"
@@ -206,6 +215,29 @@ agmsg_remote_join() {
   local payload
   payload="$(agmsg_json_join_payload "$team" "$agent" "$type" "$project")"
   agmsg_remote_post "/api/v1/teams/join" "$payload"
+}
+
+agmsg_remote_role_instruction_get() {
+  local team="$1"
+  local agent="$2"
+  local response tmp
+  response="$(agmsg_remote_get "/api/v1/role-instructions" --data-urlencode "team=$team" --data-urlencode "agent=$agent")"
+  tmp="$(mktemp)"
+  printf '%s' "$response" > "$tmp"
+  sqlite3 :memory: "SELECT COALESCE(json_extract(readfile('$(agmsg_sql_escape "$tmp")'), '$.body'), '');"
+  rm -f "$tmp"
+}
+
+agmsg_remote_role_instruction_set() {
+  local team="$1"
+  local agent="$2"
+  local body="$3"
+  local body_file payload
+  body_file="$(mktemp)"
+  printf '%s' "$body" > "$body_file"
+  payload="$(agmsg_json_role_instruction_payload "$team" "$agent" "$body_file")"
+  rm -f "$body_file"
+  agmsg_remote_post "/api/v1/role-instructions" "$payload" >/dev/null
 }
 
 agmsg_remote_team_rows() {

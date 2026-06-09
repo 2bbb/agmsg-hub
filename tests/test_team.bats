@@ -42,6 +42,35 @@ teardown() {
   [[ "$output" =~ "+1 more" ]]
 }
 
+@test "role-instructions: set and get local team role instruction" {
+  bash "$SCRIPTS/join.sh" myteam reviewer codex /tmp/proj
+  run bash "$SCRIPTS/role-instructions.sh" set myteam reviewer $'Review code.\nFocus regressions.'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Updated instruction for reviewer" ]]
+
+  run bash "$SCRIPTS/role-instructions.sh" get myteam reviewer
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Review code." ]]
+  [[ "$output" =~ "Focus regressions." ]]
+}
+
+@test "role-instructions: re-join preserves local role instruction" {
+  bash "$SCRIPTS/join.sh" myteam reviewer codex /tmp/proj-a
+  bash "$SCRIPTS/role-instructions.sh" set myteam reviewer "Keep the architecture lens." >/dev/null
+  bash "$SCRIPTS/join.sh" myteam reviewer codex /tmp/proj-b
+
+  run bash "$SCRIPTS/role-instructions.sh" get myteam reviewer
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Keep the architecture lens." ]]
+}
+
+@test "role-instructions: refuses unknown local agent" {
+  bash "$SCRIPTS/join.sh" myteam alice codex /tmp/proj
+  run bash "$SCRIPTS/role-instructions.sh" set myteam missing "Nope"
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "Agent not found" ]]
+}
+
 # --- leave.sh ---
 
 @test "leave: removes agent from team" {

@@ -8,7 +8,7 @@
 - `install.sh` は clone 済みの **agmsg-hub repo 内**で実行する開発/手動 install 用。
 - `$agmsg` は **Codex で作業する repo 内**で使う。
 - remote server は `agmsgd`。Codex CLI や Codex.app は server ではなく client/agent。
-- remote mode では message DB と team/agent registry が server 側に集まる。local mode では従来通り各 client の `~/.agents/skills/agmsg/teams/` を使う。
+- remote mode では message DB、team/agent registry、role instruction が server 側に集まる。local mode では従来通り各 client の `~/.agents/skills/agmsg/teams/` を使う。
 
 ## Install
 
@@ -113,6 +113,7 @@ http://<server-host>.local:8787/
 - health の確認
 - team 一覧
 - team member 一覧
+- role instruction の設定/変更
 - message history の確認
 - test message の送信
 
@@ -170,6 +171,24 @@ cd /Users/2bit/prog/nozzle_proj
 ```
 
 同じ project/type/agent で再 join しても重複登録にはならない。別 client や別 project から使う場合は、その client/project でも join する。
+
+## Role instruction
+
+役職ごとの振る舞いは `(team, agent)` に紐づく role instruction として保存できる。
+
+Browser UI では team を選び、member 表で role を選択し、`Role Instruction` 欄を編集して `Save` する。
+
+shell 直叩き:
+
+```bash
+~/.agents/skills/agmsg/scripts/role-instructions.sh set codex-test reviewer "Review code. Focus on regressions and missing tests."
+~/.agents/skills/agmsg/scripts/role-instructions.sh get codex-test reviewer
+~/.agents/skills/agmsg/scripts/role-instructions.sh set codex-test reviewer --file reviewer.md
+```
+
+remote mode では role instruction は server 側に保存される。client 側に個別ファイルを配る必要はない。
+
+注意: これは system prompt ではない。agmsg skill が identity 解決後に読み、現在の role guidance として扱う。system/developer instruction と `SKILL.md` の方が優先される。
 
 ## 送受信テスト
 

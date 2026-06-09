@@ -55,6 +55,7 @@ wait_for_http() {
   [[ "$output" =~ "<title>agmsgd</title>" ]]
   [[ "$output" =~ 'id="teams"' ]]
   [[ "$output" =~ "/api/v1/teams" ]]
+  [[ "$output" =~ "/api/v1/role-instructions" ]]
 }
 
 @test "remote storage: env-selected send, inbox, read, and history roundtrip" {
@@ -138,6 +139,35 @@ wait_for_http() {
   [[ "$output" =~ "suggest=true" ]]
   [[ "$output" =~ "agents=alice,bob" ]]
   [[ "$output" =~ "available_teams=testteam" ]]
+}
+
+@test "remote storage: role instructions roundtrip via API and script" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam reviewer codex /tmp/remote-reviewer
+  [ "$status" -eq 0 ]
+
+  run curl -fsS -X POST "$SERVER_URL/api/v1/role-instructions" \
+    -H "content-type: application/json" \
+    -d '{"team":"testteam","agent":"reviewer","body":"Review code.\nFocus regressions."}'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"agent":"reviewer"' ]]
+  [[ "$output" =~ "Focus regressions" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/role-instructions.sh" get testteam reviewer
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Review code." ]]
+  [[ "$output" =~ "Focus regressions." ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/role-instructions.sh" set testteam reviewer "Keep the architecture lens."
+  [ "$status" -eq 0 ]
+
+  run curl -fsS -G "$SERVER_URL/api/v1/role-instructions" \
+    --data-urlencode team=testteam \
+    --data-urlencode agent=reviewer
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Keep the architecture lens." ]]
 }
 
 @test "remote storage: inbox --wait receives a later message" {

@@ -138,6 +138,14 @@ const WEB_UI_HTML = `<!doctype html>
       outline: 2px solid var(--accent);
       outline-offset: 1px;
     }
+    .select-button {
+      padding: 4px 7px;
+      font-size: 13px;
+    }
+    .selected-row {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -211,6 +219,19 @@ const WEB_UI_HTML = `<!doctype html>
         <div id="members" class="empty"></div>
       </div>
       <div class="panel">
+        <h2>Role Instruction</h2>
+        <form id="instruction-form" class="stack">
+          <div id="instruction-target" class="status">No role selected</div>
+          <label>Instruction
+            <textarea id="instruction"></textarea>
+          </label>
+          <div class="toolbar">
+            <button class="primary" type="submit">Save</button>
+            <span id="instruction-status" class="status"></span>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
         <h2>Send</h2>
         <form id="send-form" class="stack">
           <div class="row">
@@ -237,7 +258,7 @@ const WEB_UI_HTML = `<!doctype html>
     </section>
   </main>
   <script>
-    const state = { teams: [], selectedTeam: "" };
+    const state = { teams: [], members: [], selectedTeam: "", selectedAgent: "" };
     const els = {
       health: document.querySelector("#health"),
       refresh: document.querySelector("#refresh"),
@@ -245,6 +266,10 @@ const WEB_UI_HTML = `<!doctype html>
       teams: document.querySelector("#teams"),
       teamTitle: document.querySelector("#team-title"),
       members: document.querySelector("#members"),
+      instructionForm: document.querySelector("#instruction-form"),
+      instructionTarget: document.querySelector("#instruction-target"),
+      instruction: document.querySelector("#instruction"),
+      instructionStatus: document.querySelector("#instruction-status"),
       messages: document.querySelector("#messages"),
       form: document.querySelector("#send-form"),
       from: document.querySelector("#from"),
@@ -331,29 +356,75 @@ const WEB_UI_HTML = `<!doctype html>
         els.teamTitle.textContent = "No team selected";
         els.members.className = "empty";
         els.members.textContent = "No members";
+        state.members = [];
+        state.selectedAgent = "";
+        renderInstructionEmpty();
         return;
       }
       els.teamTitle.textContent = state.selectedTeam;
       const data = await api("/api/v1/teams/members?team=" + encodeURIComponent(state.selectedTeam));
       const members = data.members || [];
+      state.members = members;
       if (members.length === 0) {
         els.members.className = "empty";
         els.members.textContent = "No members";
+        state.selectedAgent = "";
+        renderInstructionEmpty();
         return;
       }
+      if (!members.some((member) => member.name === state.selectedAgent)) {
+        state.selectedAgent = members[0].name;
+      }
       const table = document.createElement("table");
-      table.innerHTML = "<thead><tr><th>Name</th><th>Types</th><th>Project</th><th>Regs</th></tr></thead><tbody></tbody>";
+      table.innerHTML = "<thead><tr><th>Name</th><th>Types</th><th>Project</th><th>Regs</th><th></th></tr></thead><tbody></tbody>";
       for (const member of members) {
         const tr = document.createElement("tr");
+        if (member.name === state.selectedAgent) {
+          tr.className = "selected-row";
+        }
         for (const value of [member.name, member.types, member.project, member.registrations]) {
           const td = document.createElement("td");
           td.textContent = escapeText(value);
           tr.append(td);
         }
+        const action = document.createElement("td");
+        const button = document.createElement("button");
+        button.className = "select-button";
+        button.type = "button";
+        button.textContent = member.name === state.selectedAgent ? "Selected" : "Select";
+        button.addEventListener("click", async () => {
+          state.selectedAgent = member.name;
+          if (!els.from.value.trim()) {
+            els.from.value = member.name;
+          }
+          await refreshSelected();
+        });
+        action.append(button);
+        tr.append(action);
         table.querySelector("tbody").append(tr);
       }
       els.members.className = "";
       els.members.replaceChildren(table);
+    }
+
+    function renderInstructionEmpty() {
+      els.instructionTarget.textContent = "No role selected";
+      els.instruction.value = "";
+      els.instructionStatus.textContent = "";
+    }
+
+    async function loadInstruction() {
+      if (!state.selectedTeam || !state.selectedAgent) {
+        renderInstructionEmpty();
+        return;
+      }
+      els.instructionTarget.textContent = state.selectedTeam + " / " + state.selectedAgent;
+      els.instructionStatus.textContent = "";
+      const data = await api(
+        "/api/v1/role-instructions?team=" + encodeURIComponent(state.selectedTeam) +
+        "&agent=" + encodeURIComponent(state.selectedAgent)
+      );
+      els.instruction.value = data.body || "";
     }
 
     async function loadHistory() {
@@ -395,7 +466,8 @@ const WEB_UI_HTML = `<!doctype html>
     async function refreshSelected() {
       renderTeams();
       try {
-        await Promise.all([loadMembers(), loadHistory()]);
+        await loadMembers();
+        await Promise.all([loadInstruction(), loadHistory()]);
       } catch (error) {
         setHealth(error.message, "error");
       }
@@ -413,6 +485,25 @@ const WEB_UI_HTML = `<!doctype html>
 
     els.refresh.addEventListener("click", refreshAll);
     els.token.addEventListener("change", refreshAll);
+    els.instructionForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!state.selectedTeam || !state.selectedAgent) return;
+      els.instructionStatus.textContent = "";
+      try {
+        await api("/api/v1/role-instructions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            team: state.selectedTeam,
+            agent: state.selectedAgent,
+            body: els.instruction.value,
+          }),
+        });
+        els.instructionStatus.textContent = "Saved";
+      } catch (error) {
+        els.instructionStatus.textContent = error.message;
+      }
+    });
     els.form.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!state.selectedTeam) return;
@@ -529,6 +620,15 @@ function initDb(path) {
       ON registrations(project_path, agent_type);
     CREATE INDEX IF NOT EXISTS idx_registrations_team_agent
       ON registrations(team, agent);
+
+    CREATE TABLE IF NOT EXISTS role_instructions (
+      team TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      body TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (team, agent),
+      FOREIGN KEY (team) REFERENCES teams(name) ON DELETE CASCADE
+    );
   `);
   return db;
 }
@@ -654,6 +754,14 @@ function createHandler({ db, token, verbose }) {
     }
     if (req.method === 'GET' && url.pathname === '/api/v1/teams/members') {
       handleTeamMembers(url, res, db);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/v1/role-instructions') {
+      handleGetRoleInstruction(url, res, db);
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/v1/role-instructions') {
+      await handleSetRoleInstruction(req, res, db);
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/v1/identities') {
@@ -857,6 +965,75 @@ function handleTeamMembers(url, res, db) {
   `).all(team);
 
   jsonResponse(res, 200, { team, members: rows });
+}
+
+function requireRegisteredAgent(res, db, team, agent) {
+  const row = db.prepare(`
+    SELECT 1
+    FROM registrations
+    WHERE team = ? AND agent = ?
+    LIMIT 1
+  `).get(team, agent);
+  if (row) {
+    return true;
+  }
+  errorResponse(res, 404, 'not_found', 'team/agent registration not found');
+  return false;
+}
+
+function handleGetRoleInstruction(url, res, db) {
+  const team = url.searchParams.get('team') || '';
+  const agent = url.searchParams.get('agent') || '';
+  if (!team || !agent) {
+    errorResponse(res, 400, 'missing_field', 'team and agent are required');
+    return;
+  }
+  if (!requireRegisteredAgent(res, db, team, agent)) {
+    return;
+  }
+
+  const row = db.prepare(`
+    SELECT body, updated_at
+    FROM role_instructions
+    WHERE team = ? AND agent = ?
+  `).get(team, agent);
+
+  jsonResponse(res, 200, {
+    team,
+    agent,
+    body: row?.body || '',
+    updated_at: row?.updated_at || null,
+  });
+}
+
+async function handleSetRoleInstruction(req, res, db) {
+  const payload = await readJson(req);
+  if (payload === null) {
+    errorResponse(res, 400, 'invalid_json', 'request body is not valid JSON');
+    return;
+  }
+
+  const team = payload.team || '';
+  const agent = payload.agent || '';
+  const body = payload.body;
+  if (!team || !agent || typeof body !== 'string') {
+    errorResponse(res, 400, 'missing_field', 'team, agent, and string body are required');
+    return;
+  }
+  if (!requireRegisteredAgent(res, db, team, agent)) {
+    return;
+  }
+
+  const row = db.prepare(`
+    INSERT INTO role_instructions (team, agent, body, updated_at)
+    VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    ON CONFLICT(team, agent) DO UPDATE SET
+      body = excluded.body,
+      updated_at = excluded.updated_at
+    RETURNING team, agent, body, updated_at
+  `).get(team, agent, body);
+
+  jsonResponse(res, 200, row);
 }
 
 function handleIdentities(url, res, db) {

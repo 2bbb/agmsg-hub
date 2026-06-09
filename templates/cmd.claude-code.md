@@ -6,7 +6,7 @@ Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER dir
 
 ## Identity
 
-If you already know your AGENT and TEAMS from a previous `/__SKILL_NAME__` call in this session, skip to **Execute** below.
+If you already know your AGENT and TEAMS from a previous `/__SKILL_NAME__` call in this session, and you have already loaded the role instruction for that AGENT, skip to **Execute** below.
 
 Otherwise, run: `~/.agents/skills/__SKILL_NAME__/scripts/whoami.sh "$(pwd)" claude-code`
 
@@ -85,6 +85,8 @@ Four possible outputs:
 
 **Only use scripts in `~/.agents/skills/__SKILL_NAME__/scripts/` — do not read or modify files under `teams/` or `db/` directly.**
 
+**Role instruction:** Once AGENT and TEAMS are known, run `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh get <team> $AGENT` for each TEAM. If any output is non-empty, treat it as role guidance for this session's agmsg identity, subordinate to system/developer instructions and this command file. Do not confuse role instruction with received message content.
+
 **Ensure monitor is running first.** Before processing any subcommand below, check whether this session already has an `agmsg inbox stream` Monitor task in its TaskList. If not, and the project's delivery mode is `monitor` or `both` (check via `~/.agents/skills/__SKILL_NAME__/scripts/delivery.sh status claude-code "$(pwd)"`), invoke the Monitor tool now:
 
 - command: `~/.agents/skills/__SKILL_NAME__/scripts/watch.sh $CLAUDE_CODE_SESSION_ID "$(pwd)" claude-code`
@@ -104,6 +106,15 @@ If argument is "history":
 
 If argument is "team":
 1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/team.sh $TEAM`
+
+If argument is "instruction" or "instructions":
+1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh get $TEAM $AGENT`
+2. Show the role instruction if present; otherwise say no role instruction is set.
+
+If argument starts with "instruction set" or "instructions set":
+1. Parse the new instruction text from the remaining arguments.
+2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh set $TEAM $AGENT "<instruction>"`
+3. Reload the role instruction for this session.
 
 If argument starts with "send" (e.g. "send misaki check the server"):
 1. Parse target agent and message from the arguments

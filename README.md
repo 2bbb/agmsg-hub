@@ -122,6 +122,22 @@ You can join the same project with multiple agent names (e.g. `cc` and `reviewer
 ~/.agents/skills/agmsg/scripts/join.sh myteam reviewer claude-code /path/to/project
 ```
 
+### Role instructions
+
+Each `(team, agent)` identity can carry a role instruction. This is useful when
+names like `reviewer`, `planner`, or `tech-lead` should imply stable behavior
+instead of being just routing labels.
+
+```bash
+~/.agents/skills/agmsg/scripts/role-instructions.sh set myteam reviewer "Review code. Focus on regressions and missing tests."
+~/.agents/skills/agmsg/scripts/role-instructions.sh get myteam reviewer
+~/.agents/skills/agmsg/scripts/role-instructions.sh set myteam reviewer --file reviewer.md
+```
+
+When an agmsg skill resolves its active identity, it reads the role instruction
+for that `(team, agent)` and treats it as guidance for the current session,
+below system/developer instructions and the skill's own rules.
+
 ### Multiple roles per project (`actas` / `drop`)
 
 Same project, same agent type, different role — for example a `tech-lead` identity for architecture reviews and a `biz-analyst` identity for requirements work, both living on top of the same workspace. Toolset and assets are shared; only the role differs.
@@ -262,6 +278,8 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 ~/.agents/skills/<cmd>/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2
 ~/.agents/skills/<cmd>/scripts/history.sh <team> [agent_id] [limit]
 ~/.agents/skills/<cmd>/scripts/team.sh <team>
+~/.agents/skills/<cmd>/scripts/role-instructions.sh get <team> <agent>
+~/.agents/skills/<cmd>/scripts/role-instructions.sh set <team> <agent> "<instruction>"
 ~/.agents/skills/<cmd>/scripts/whoami.sh <project_path> <type>
 ~/.agents/skills/<cmd>/scripts/delivery.sh set <mode> <type> <project_path>
 ~/.agents/skills/<cmd>/scripts/delivery.sh status [<type> <project_path>]
@@ -273,8 +291,9 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 ## Remote Server MVP
 
 Local SQLite remains the default. Remote mode is opt-in and currently covers
-the core message flow plus server-side team registry: `join.sh`, `team.sh`,
-`whoami.sh`, `send.sh`, `inbox.sh`, and `history.sh` over HTTP.
+the core message flow plus server-side team registry and role instructions:
+`join.sh`, `team.sh`, `whoami.sh`, `role-instructions.sh`, `send.sh`,
+`inbox.sh`, and `history.sh` over HTTP.
 
 Start a server on the machine that should own the shared SQLite store:
 
@@ -284,7 +303,8 @@ Start a server on the machine that should own the shared SQLite store:
 
 The same server also exposes a small browser dashboard at
 `http://127.0.0.1:8787/` for checking health, teams, members, history, and
-sending test messages.
+sending test messages. Team members can be selected in the dashboard and their
+role instructions can be edited there.
 
 Configure a client and switch it to remote storage:
 
