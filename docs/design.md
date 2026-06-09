@@ -10,6 +10,8 @@ identified by `team + agent + agent_type + client_id + project_path`.
 - An agent can be registered from multiple projects under the same name.
 - A single absolute `project_path` is not globally unique across machines.
 - `whoami.sh` resolves the current role with `client_id + project_path + type`.
+- `agmsg-client.mjs whoami` resolves the same identity over the remote HTTP API
+  for Windows native and other Node-only clients.
 - `project_key` is optional grouping metadata, not authentication or identity.
 - New messages carry `project_id/project_key/project_path`, so history and inbox
   delivery can be scoped to the current project. Legacy messages with NULL
@@ -135,6 +137,8 @@ A marker file (`run/.lastcheck-<hash(team,agent,client_id)>`) tracks the last ch
 
 | Script | Purpose |
 |---|---|
+| `agmsg-client.mjs` | Portable Node remote client for Windows native / PowerShell |
+| `agmsg.ps1` | PowerShell dispatcher for `agmsg-client.mjs` |
 | `init-db.sh` | Create SQLite database with schema |
 | `send.sh` | Insert a message into the database |
 | `inbox.sh` | Show unread messages and mark as read |
@@ -148,7 +152,8 @@ A marker file (`run/.lastcheck-<hash(team,agent,client_id)>`) tracks the last ch
 | `check-inbox.sh` | Hook entry point — resolve all exact identities, cooldown, check, notify |
 | `config.sh` | Read/write user config (YAML) |
 
-All scripts use only `bash` and `sqlite3`. No python3 dependency.
+The POSIX scripts use only `bash` and `sqlite3`. No python3 dependency. The
+Windows native client path uses Node.js and supports remote storage only.
 
 ## Install Layout
 
@@ -157,7 +162,7 @@ All scripts use only `bash` and `sqlite3`. No python3 dependency.
 ├── SKILL.md              # Read by Codex (generated from cmd.codex.md template)
 ├── agents/
 │   └── openai.yaml       # Codex metadata
-├── scripts/              # All shell scripts
+├── scripts/              # Shell scripts plus Node/PowerShell remote client
 ├── templates/            # Command templates (cmd.claude-code.md, cmd.codex.md)
 ├── db/
 │   ├── messages.db       # SQLite message store (relocatable via AGMSG_STORAGE_PATH)
@@ -174,12 +179,15 @@ Claude Code command is installed separately to `~/.claude/commands/<cmd>.md`.
 
 ## Dependencies
 
-- **bash** — shell
-- **sqlite3** — database and JSON manipulation (JSON1 extension)
-- **awk/sed** — text processing (config, TOML editing)
+- **bash** — POSIX client shell
+- **sqlite3** — local database and JSON manipulation (JSON1 extension)
+- **awk/sed** — POSIX config/TOML editing
+- **Node.js** — server and portable remote client
+- **PowerShell** — Windows native dispatcher (`scripts/agmsg.ps1`)
 
-Local mode has no python3, no node, no network, and no daemon. Remote server
-mode is optional and requires Node.js 24+ on the server host.
+Local POSIX mode has no python3, no node, no network, and no daemon. Remote
+server mode requires Node.js 24+ on the server host. Windows native clients use
+the Node remote client and do not support local SQLite mode.
 
 ## Client identity
 

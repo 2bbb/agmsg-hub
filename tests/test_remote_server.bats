@@ -135,6 +135,53 @@ wait_for_http() {
   '
 }
 
+@test "remote storage: node client supports Windows-native command path" {
+  CLIENT="$BATS_TEST_DIRNAME/../scripts/agmsg-client.mjs"
+
+  run node "$CLIENT" remote configure "$SERVER_URL"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Configured remote.url" ]]
+
+  run node "$CLIENT" remote switch remote
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Switched storage.active = remote" ]]
+
+  run node "$CLIENT" remote status
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "storage.active=remote" ]]
+  [[ "$output" =~ "remote.health=ok" ]]
+
+  run node "$CLIENT" join testteam win-codex codex /tmp/win-native-project
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Joined team testteam as win-codex" ]]
+
+  run node "$CLIENT" whoami /tmp/win-native-project codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=win-codex" ]]
+  [[ "$output" =~ "teams=testteam" ]]
+
+  run node "$CLIENT" send testteam win-codex reviewer "hello from node client" --project /tmp/win-native-project
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Sent to reviewer" ]]
+
+  run node "$CLIENT" join testteam reviewer codex /tmp/win-native-project
+  [ "$status" -eq 0 ]
+
+  run node "$CLIENT" inbox testteam reviewer --project /tmp/win-native-project
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "1 new message" ]]
+  [[ "$output" =~ "win-codex: hello from node client" ]]
+
+  run node "$CLIENT" history testteam reviewer 20 --project /tmp/win-native-project
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "win-codex → reviewer: hello from node client" ]]
+
+  run node "$CLIENT" team testteam
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "win-codex" ]]
+  [[ "$output" =~ "reviewer" ]]
+}
+
 @test "remote storage: read receipts are scoped to client id" {
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
     bash "$SCRIPTS/send.sh" testteam alice bob "remote per-client"

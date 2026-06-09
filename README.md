@@ -70,10 +70,17 @@ choose a custom command name, or install agent-specific command templates:
 ./install.sh --agent-type gemini  # Install a Gemini-oriented SKILL.md
 ```
 
-agmsg is a Bash + SQLite tool. macOS and Linux are the primary targets.
-Windows native shells are not a supported target for the local SQLite mode yet;
-use WSL or Git Bash with `bash` and `sqlite3` available. Server-backed remote
-mode is available as an opt-in MVP and requires Node.js 24+ on the server host.
+agmsg has two client paths:
+
+- POSIX client scripts: Bash + sqlite3, for macOS/Linux and local SQLite fallback.
+- Portable remote client: Node.js, for Windows native PowerShell and any client
+  that talks to an agmsg-hub server.
+
+Windows native shells are supported for **remote mode** via
+`scripts/agmsg.ps1` / `scripts/agmsg-client.mjs`. Windows native local SQLite
+mode is not supported; use the remote server design there. Server-backed remote
+mode requires Node.js 24+ on the server host, and Windows native clients need
+Node.js available in PowerShell.
 
 The **command name** determines:
 - Skill folder: `~/.agents/skills/<cmd>/`
@@ -109,6 +116,15 @@ Or join manually:
 
 ```bash
 ~/.agents/skills/agmsg/scripts/join.sh myteam alice claude-code /path/to/project
+```
+
+Windows native PowerShell remote client:
+
+```powershell
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+& $agmsg remote configure http://127.0.0.1:8787
+& $agmsg remote switch remote
+& $agmsg join myteam alice codex (Get-Location).Path
 ```
 
 To leave a team:
@@ -317,6 +333,38 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 
 `hook.sh on|off` still works as a legacy alias for `delivery.sh set turn|off` but prints a deprecation notice.
 
+### Windows Native PowerShell
+
+Use the Node-backed dispatcher. It is remote-only and does not require Bash,
+sqlite3, or curl on the client:
+
+```powershell
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+
+& $agmsg remote status
+& $agmsg remote configure http://127.0.0.1:8787
+& $agmsg remote switch remote
+& $agmsg whoami (Get-Location).Path codex
+& $agmsg join myteam alice codex (Get-Location).Path
+& $agmsg inbox myteam alice --project (Get-Location).Path
+& $agmsg send myteam alice bob "hello from Windows" --project (Get-Location).Path
+& $agmsg history myteam alice 20 --project (Get-Location).Path
+& $agmsg team myteam
+```
+
+The Windows native client supports remote `join`, `whoami`, `send`, `inbox`,
+`history`, `team`, `role-instructions`, `reset`, and `remote` configuration.
+Delivery hook automation is still implemented by the POSIX scripts; on Windows
+native Codex, use manual `$agmsg` / `$agmsg wait` style polling until hook
+support is ported.
+
+If PowerShell execution policy blocks `agmsg.ps1`, call the Node client
+directly:
+
+```powershell
+node "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg-client.mjs" remote status
+```
+
 ## Server
 
 The server is independent from the skill. Run one agmsg-hub server on the
@@ -330,6 +378,14 @@ Start a server on the machine that should own the shared SQLite store:
 git clone https://github.com/2bbb/agmsg-hub.git
 cd agmsg-hub
 ./server/server.sh serve --host 127.0.0.1 --port 8787
+```
+
+Windows native PowerShell server:
+
+```powershell
+git clone https://github.com/2bbb/agmsg-hub.git
+cd agmsg-hub
+node .\server\agmsgd.mjs --db "$env:USERPROFILE\.agmsg-hub\db\messages.db" --host 0.0.0.0 --port 8787
 ```
 
 The same server also exposes a small browser dashboard at
@@ -360,6 +416,15 @@ Configure each client skill and switch it to the server:
 ~/.agents/skills/agmsg/scripts/remote.sh configure http://127.0.0.1:8787
 ~/.agents/skills/agmsg/scripts/remote.sh switch remote
 ~/.agents/skills/agmsg/scripts/remote.sh status
+```
+
+Windows native PowerShell equivalent:
+
+```powershell
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+& $agmsg remote configure http://127.0.0.1:8787
+& $agmsg remote switch remote
+& $agmsg remote status
 ```
 
 You can also test remote mode without changing config:

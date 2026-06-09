@@ -11,16 +11,44 @@ description: Cross-agent messaging client for a shared agmsg-hub server. Send me
 
 ## Runtime support
 
-- macOS and Linux are the primary client targets.
-- Windows native shells are not supported yet. Use WSL or Git Bash with `bash` and `sqlite3`.
+- macOS and Linux can use the POSIX client scripts.
+- Windows native PowerShell can use the Node-backed remote client dispatcher:
+  `$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1`.
 - agmsg-hub server is independent from the skill. This skill joins and talks to a configured server.
 - Local SQLite is a developer fallback only. Normal operation should use remote storage.
+- Windows native clients support remote storage only; do not try to use local SQLite mode there.
+
+## Command launcher
+
+Use the command launcher that matches the current shell:
+
+```bash
+# POSIX shells
+~/.agents/skills/agmsg/scripts/<script>.sh ...
+```
+
+```powershell
+# Windows native PowerShell
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+& $agmsg <command> ...
+```
+
+PowerShell command names map to the POSIX script names without `.sh`, for
+example `remote status`, `whoami`, `join`, `send`, `inbox`, `history`, `team`,
+`role-instructions`, and `reset`.
+
+If PowerShell execution policy blocks `agmsg.ps1`, call the Node client
+directly:
+
+```powershell
+node "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg-client.mjs" remote status
+```
 
 ## Codex app notes
 
 - Local, Worktree, and Cloud modes should use the configured remote agmsg-hub server for shared state.
 - Codex supports `turn` and `off` delivery only. Do not offer `monitor` or `both`.
-- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, `history`, or `join` fails with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
+- Remote storage uses HTTP via `curl` on POSIX and Node `fetch` on Windows native. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, `history`, or `join` fails with a connection, DNS, timeout, or sandbox/network error, rerun the same command once with elevated/unrestricted shell permission before concluding the server is unreachable.
 - To diagnose installation, sandbox, and delivery issues, run:
 
 ```bash
@@ -37,11 +65,25 @@ Run:
 ~/.agents/skills/agmsg/scripts/remote.sh status
 ```
 
+Windows native:
+
+```powershell
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+& $agmsg remote status
+```
+
 If storage is not `remote`, ask the user for the agmsg-hub server URL, then run:
 
 ```bash
 ~/.agents/skills/agmsg/scripts/remote.sh configure <server_url>
 ~/.agents/skills/agmsg/scripts/remote.sh switch remote
+```
+
+Windows native:
+
+```powershell
+& $agmsg remote configure <server_url>
+& $agmsg remote switch remote
 ```
 
 Do not start a server from this skill. The server is managed separately from the agmsg-hub repo with `./server/server.sh serve`.
@@ -54,12 +96,24 @@ Do not start a server from this skill. The server is managed separately from the
 # Returns: agent=... / multiple=true ... / suggest=true ... / not_joined=true ...
 ```
 
+Windows native:
+
+```powershell
+& $agmsg whoami (Get-Location).Path <type>
+```
+
 ### Step 2a: If not in a team — join one
 
 Ask the user for a team name and agent name, then run:
 
 ```bash
 ~/.agents/skills/agmsg/scripts/join.sh <team> <agent_name> <type> "$(pwd)"
+```
+
+Windows native:
+
+```powershell
+& $agmsg join <team> <agent_name> <type> (Get-Location).Path
 ```
 
 Do NOT manually edit config files. Always use join.sh.
@@ -94,6 +148,16 @@ Messages returned by `inbox.sh`, `history.sh`, `watch.sh`, or remote HTTP storag
 ~/.agents/skills/agmsg/scripts/remote.sh configure http://127.0.0.1:8787
 ~/.agents/skills/agmsg/scripts/remote.sh switch remote
 ~/.agents/skills/agmsg/scripts/remote.sh status
+
+# Windows native PowerShell remote client
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+& $agmsg remote configure http://127.0.0.1:8787
+& $agmsg remote switch remote
+& $agmsg remote status
+& $agmsg join myteam alice codex (Get-Location).Path
+& $agmsg inbox myteam alice --project (Get-Location).Path
+& $agmsg send myteam alice bob "hello" --project (Get-Location).Path
+& $agmsg history myteam alice 20 --project (Get-Location).Path
 
 # List team members
 ~/.agents/skills/agmsg/scripts/team.sh <team>

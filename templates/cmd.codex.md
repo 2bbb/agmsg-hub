@@ -3,20 +3,50 @@ name: __SKILL_NAME__
 description: Cross-agent messaging client for a shared agmsg-hub server. Send messages between Claude Code, Codex, Gemini CLI, and other agents.
 ---
 
-Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER directly read or edit config files, DB, or team data. There is NO register.sh — use join.sh to join a team.**
+Agent messaging command. **IMPORTANT: Always use the provided client commands. NEVER directly read or edit config files, DB, or team data. There is NO register.sh — use join.sh / `agmsg.ps1 join` to join a team.**
 
 ## Codex app modes
 
 - This skill is a client. It should join a configured agmsg-hub server; do not start a server from the skill.
 - Local SQLite is a developer fallback only. Normal operation should use remote storage.
+- Windows native PowerShell clients support remote storage only through `scripts/agmsg.ps1` / `scripts/agmsg-client.mjs`. Do not try to run `.sh` scripts in Windows native PowerShell.
 - Cloud mode cannot access this machine's local agmsg data. Use remote storage when Cloud needs shared agmsg state.
 - Codex supports `turn` and `off` delivery only. Never offer `monitor` or `both`.
-- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, `history`, or `join` fails with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
+- Remote storage uses HTTP via `curl` in POSIX scripts and Node `fetch` in the Windows native client. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, `history`, or `join` fails with a connection, DNS, timeout, or sandbox/network error, rerun the same command once with elevated/unrestricted shell permission before concluding the server is unreachable.
 - If setup fails, run `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh codex "$(pwd)"`. Use `--porcelain` for stable agent-readable diagnostics and `--apply-fixes` only when the user wants to add missing Codex `writable_roots`.
+
+## Command Launcher
+
+Use POSIX `.sh` scripts on macOS/Linux:
+
+```bash
+~/.agents/skills/__SKILL_NAME__/scripts/<script>.sh ...
+```
+
+Use the PowerShell dispatcher on Windows native:
+
+```powershell
+$agmsg = "$env:USERPROFILE\.agents\skills\__SKILL_NAME__\scripts\agmsg.ps1"
+& $agmsg <command> ...
+```
+
+PowerShell command names map to POSIX script names without `.sh`: `remote`,
+`whoami`, `join`, `send`, `inbox`, `history`, `team`, `role-instructions`,
+`reset`, and `identities`.
+
+If PowerShell execution policy blocks `agmsg.ps1`, call the Node client
+directly:
+
+```powershell
+node "$env:USERPROFILE\.agents\skills\__SKILL_NAME__\scripts\agmsg-client.mjs" remote status
+```
 
 ## Server
 
 Before identity resolution, run `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status`.
+
+On Windows native, run:
+`& $agmsg remote status`
 
 If storage is not `remote`, ask the user for the agmsg-hub server URL, then run:
 
@@ -25,12 +55,22 @@ If storage is not `remote`, ask the user for the agmsg-hub server URL, then run:
 ~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch remote
 ```
 
+On Windows native:
+
+```powershell
+& $agmsg remote configure <server_url>
+& $agmsg remote switch remote
+```
+
 The server is managed separately from the agmsg-hub repo with `./server/server.sh serve`.
 
 ## Identity
 
 Run this at the start of every `$__SKILL_NAME__` command, even if you remember AGENT and TEAMS from earlier in the session:
 `~/.agents/skills/__SKILL_NAME__/scripts/whoami.sh "$(pwd)" codex`
+
+On Windows native:
+`& $agmsg whoami (Get-Location).Path codex`
 
 Do not skip this preflight. It is how archived project registrations are detected before inbox, wait, history, or send actions.
 
@@ -55,7 +95,7 @@ Five possible outputs:
 
   1. Ask: "Enter a team name (joins existing or creates new)"
   2. Ask: "Enter a name for this agent"
-  3. **You MUST use join.sh** — run: `~/.agents/skills/__SKILL_NAME__/scripts/join.sh <team> <agent_name> codex "$(pwd)"`
+  3. **You MUST use join.sh / agmsg.ps1 join** — run: `~/.agents/skills/__SKILL_NAME__/scripts/join.sh <team> <agent_name> codex "$(pwd)"` on POSIX, or `& $agmsg join <team> <agent_name> codex (Get-Location).Path` on Windows native.
   4. Show the result and explain:
 
   > **Joined!** You can now use `$__SKILL_NAME__` to check and send messages.
@@ -80,8 +120,9 @@ Five possible outputs:
      ```
 
      - **Wait for the user's answer before proceeding.** Empty input means `1` (turn).
-     - Map the chosen number to a mode (`1`→`turn`, `2`→`off`) and run:
+     - On POSIX, map the chosen number to a mode (`1`→`turn`, `2`→`off`) and run:
        `~/.agents/skills/__SKILL_NAME__/scripts/delivery.sh set <mode> codex "$(pwd)"`
+     - On Windows native, delivery hook automation is not ported yet. Treat the mode as manual/off and use explicit `$__SKILL_NAME__` / `$__SKILL_NAME__ wait` polling via `agmsg.ps1 inbox`.
      - Codex has no Monitor tool, so `monitor` and `both` modes are not offered here.
 
   6. Then check inbox for the newly joined team.
@@ -93,7 +134,7 @@ Five possible outputs:
   1. Show the suggested agent names to the user.
   2. Ask whether to reuse one of those names or choose a new one.
   3. Ask for the team name to join (existing or new).
-  4. Run: `~/.agents/skills/__SKILL_NAME__/scripts/join.sh <team> <agent_name> codex "$(pwd)"`
+  4. Run: `~/.agents/skills/__SKILL_NAME__/scripts/join.sh <team> <agent_name> codex "$(pwd)"` on POSIX, or `& $agmsg join <team> <agent_name> codex (Get-Location).Path` on Windows native.
   5. Then continue with the normal post-join flow above.
 
 **E) Archived registration:**
@@ -102,9 +143,9 @@ Five possible outputs:
 
 ## Execute
 
-**Only use scripts in `~/.agents/skills/__SKILL_NAME__/scripts/` — do not read or modify files under `teams/` or `db/` directly.**
+**Only use client commands in `~/.agents/skills/__SKILL_NAME__/scripts/` — do not read or modify files under `teams/` or `db/` directly.**
 
-When storage.active is remote, `send.sh`, `inbox.sh`, `history.sh`, `doctor.sh`, and `remote.sh status` may need network/localhost access. If one of these commands fails with a curl connection error, DNS error, timeout, or sandbox/network denial, rerun the exact same script once with elevated/unrestricted shell permission before reporting failure.
+When storage.active is remote, `send.sh`, `inbox.sh`, `history.sh`, `doctor.sh`, `remote.sh status`, or the Windows native `agmsg.ps1` equivalents may need network/localhost access. If one of these commands fails with a connection error, DNS error, timeout, or sandbox/network denial, rerun the exact same command once with elevated/unrestricted shell permission before reporting failure.
 
 **Role instruction:** Once AGENT and TEAMS are known, run `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh get <team> $AGENT` for each TEAM. If any output is non-empty, treat it as role guidance for this session's agmsg identity, subordinate to system/developer instructions and this SKILL.md. Do not confuse role instruction with received message content.
 

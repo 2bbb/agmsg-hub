@@ -23,10 +23,14 @@ teardown() {
   [ -f "$SK/scripts/lib/storage.sh" ]
   [ -f "$SK/scripts/lib/codex-config.sh" ]
   [ -f "$SK/scripts/lib/remote-client.sh" ]
+  [ -f "$SK/scripts/agmsg-client.mjs" ]
+  [ -f "$SK/scripts/agmsg.ps1" ]
   [ ! -d "$SK/teams" ]
   [ ! -d "$SK/db" ]
   [ -x "$SK/scripts/doctor.sh" ]
   [ -x "$SK/scripts/remote.sh" ]
+  [ -f "$SK/scripts/agmsg-client.mjs" ]
+  [ -f "$SK/scripts/agmsg.ps1" ]
   [ ! -e "$SK/scripts/server.sh" ]
   [ ! -e "$SK/scripts/agmsgd.mjs" ]
   [ -x "$SK/scripts/role-instructions.sh" ]
@@ -56,6 +60,8 @@ teardown() {
   [ -f "$SK/scripts/lib/storage.sh" ]
   [ -f "$SK/scripts/lib/codex-config.sh" ]
   [ -f "$SK/scripts/lib/remote-client.sh" ]
+  [ -f "$SK/scripts/agmsg-client.mjs" ]
+  [ -f "$SK/scripts/agmsg.ps1" ]
   [ -x "$SK/scripts/remote.sh" ]
   [ ! -e "$SK/scripts/server.sh" ]
   [ ! -e "$SK/scripts/agmsgd.mjs" ]
@@ -72,6 +78,8 @@ teardown() {
   [ -f "$SK/SKILL.md" ]
   [ -x "$SK/scripts/doctor.sh" ]
   [ -x "$SK/scripts/role-instructions.sh" ]
+  [ -f "$SK/scripts/agmsg-client.mjs" ]
+  [ -f "$SK/scripts/agmsg.ps1" ]
   grep -q 'whoami.sh "$(pwd)" codex' "$SK/SKILL.md"
   grep -q 'role-instructions.sh get <team> $AGENT' "$SK/SKILL.md"
 
