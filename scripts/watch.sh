@@ -38,6 +38,7 @@ source "$SCRIPT_DIR/lib/client.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/actas-lock.sh"
 CLIENT_ID="$(agmsg_client_id)"
+PROJECT_ID="$(agmsg_project_key "$PROJECT_PATH")"
 REMOTE=false
 if agmsg_using_remote_storage; then
   REMOTE=true
@@ -163,6 +164,18 @@ ensure_read_receipts_table() {
   [ "$REMOTE" = false ] || return 0
   [ -f "$DB" ] || return 0
   sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN project_id TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN project_key TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN project_path TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN from_client_id TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
     CREATE TABLE IF NOT EXISTS message_reads (
       message_id INTEGER NOT NULL,
       team TEXT NOT NULL,
@@ -173,22 +186,25 @@ ensure_read_receipts_table() {
     );
     CREATE INDEX IF NOT EXISTS idx_message_reads_inbox
       ON message_reads(team, agent, client_id, message_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_project
+      ON messages(team, project_id, created_at DESC);
   " 2>/dev/null || true
 }
 
 fetch_pair_unread() {
   local team="$1" agent="$2"
   if [ "$REMOTE" = true ]; then
-    agmsg_remote_unread_rows "$team" "$agent" 100
+    agmsg_remote_unread_rows "$team" "$agent" 100 "$PROJECT_PATH"
     return
   fi
 
   [ -f "$DB" ] || return 0
   ensure_read_receipts_table
-  local t_esc a_esc c_esc
+  local t_esc a_esc c_esc p_esc
   t_esc="$(sql_escape "$team")"
   a_esc="$(sql_escape "$agent")"
   c_esc="$(sql_escape "$CLIENT_ID")"
+  p_esc="$(sql_escape "$PROJECT_ID")"
   sqlite3 -separator $'\t' "$DB" "
     SELECT
       m.id,
@@ -201,6 +217,7 @@ fetch_pair_unread() {
      AND mr.client_id = '$c_esc'
     WHERE m.team = '$t_esc'
       AND m.to_agent = '$a_esc'
+      AND m.project_id = '$p_esc'
       AND mr.message_id IS NULL
     ORDER BY m.id ASC
     LIMIT 100;

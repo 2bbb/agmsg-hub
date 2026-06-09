@@ -4,13 +4,17 @@ Developer documentation for contributors and maintainers.
 
 ## Identity Model
 
-A role is addressed by `(team, agent)`. A client registration is identified by
-`team + agent + agent_type + client_id + project_path`.
+A runtime address is `(team, project_id, agent)`. A client registration is
+identified by `team + agent + agent_type + client_id + project_path`.
 
 - An agent can be registered from multiple projects under the same name.
 - A single absolute `project_path` is not globally unique across machines.
 - `whoami.sh` resolves the current role with `client_id + project_path + type`.
 - `project_key` is optional grouping metadata, not authentication or identity.
+- New messages carry `project_id/project_key/project_path`, so history and inbox
+  delivery can be scoped to the current project. Legacy messages with NULL
+  project metadata are treated as `Unassigned` and only appear in all-project
+  history.
 
 ## Data Storage
 
@@ -28,6 +32,10 @@ A role is addressed by `(team, agent)`. A client registration is identified by
     from_agent TEXT NOT NULL,
     to_agent TEXT NOT NULL,
     body TEXT NOT NULL,
+    project_id TEXT,
+    project_key TEXT,
+    project_path TEXT,
+    from_client_id TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     read_at TEXT
   );
@@ -43,7 +51,8 @@ A role is addressed by `(team, agent)`. A client registration is identified by
   ```
 - `messages.read_at` is a compatibility/summary timestamp: first read by any client.
 - Unread queries use `message_reads` scoped by `client_id`, so one client reading a role's message does not hide it from another client using the same role.
-- Indexes on `(team, to_agent, read_at)`, `(team, created_at)`, and `(team, agent, client_id, message_id)`.
+- Project-scoped inbox/history queries filter by `messages.project_id`.
+- Indexes on `(team, to_agent, read_at)`, `(team, created_at)`, `(team, project_id, created_at)`, and `(team, agent, client_id, message_id)`.
 
 ### Team Config — JSON
 

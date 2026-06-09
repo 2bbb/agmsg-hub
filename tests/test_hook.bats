@@ -132,7 +132,7 @@ print(len(d['hooks']['Stop']))
 # whole exclusivity guarantee for codex / claude-code-turn delivery paths.
 @test "check-inbox: skips a team when (team, agent) is locked by another live session" {
   bash "$SCRIPTS/join.sh" testteam alice claude-code "$TEST_PROJECT"
-  bash "$SCRIPTS/send.sh" testteam bob alice "should not be delivered here"
+  bash "$SCRIPTS/send.sh" testteam bob alice "should not be delivered here" --project "$TEST_PROJECT"
 
   setup_live_owner "$TEST_SKILL_DIR/run" "peer-sid"
   echo "peer-sid" > "$TEST_SKILL_DIR/run/actas.testteam__alice.session"
@@ -145,7 +145,7 @@ print(len(d['hooks']['Stop']))
 
 @test "check-inbox: still delivers when the lock is owned by this session" {
   bash "$SCRIPTS/join.sh" testteam alice claude-code "$TEST_PROJECT"
-  bash "$SCRIPTS/send.sh" testteam bob alice "I am the owner"
+  bash "$SCRIPTS/send.sh" testteam bob alice "I am the owner" --project "$TEST_PROJECT"
 
   setup_live_owner "$TEST_SKILL_DIR/run" "mine-sid"
   echo "mine-sid" > "$TEST_SKILL_DIR/run/actas.testteam__alice.session"
@@ -158,8 +158,8 @@ print(len(d['hooks']['Stop']))
 @test "check-inbox: checks every exact identity for the project and type" {
   bash "$SCRIPTS/join.sh" testteam alice claude-code "$TEST_PROJECT"
   bash "$SCRIPTS/join.sh" testteam reviewer claude-code "$TEST_PROJECT"
-  bash "$SCRIPTS/send.sh" testteam bob alice "for alice"
-  bash "$SCRIPTS/send.sh" testteam bob reviewer "for reviewer"
+  bash "$SCRIPTS/send.sh" testteam bob alice "for alice" --project "$TEST_PROJECT"
+  bash "$SCRIPTS/send.sh" testteam bob reviewer "for reviewer" --project "$TEST_PROJECT"
   bash "$SCRIPTS/config.sh" set delivery.turn.check_interval 0 >/dev/null
 
   run bash -c "echo '{}' | bash '$SCRIPTS/check-inbox.sh' claude-code '$TEST_PROJECT'"

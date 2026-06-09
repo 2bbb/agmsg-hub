@@ -240,6 +240,7 @@ const WEB_UI_HTML = `<!doctype html>
     <h1>agmsgd</h1>
     <nav class="nav">
       <a href="/">Projects</a>
+      <a href="/all">All</a>
       <a href="/archive">Archive</a>
     </nav>
   </header>
@@ -260,11 +261,11 @@ const WEB_UI_HTML = `<!doctype html>
       <div id="archive-list" class="empty"></div>
     </section>
     <section id="workspace-view" class="stack">
-      <div class="panel">
+      <div class="panel" id="history-panel">
         <h2>History</h2>
         <div id="messages" class="messages"></div>
       </div>
-      <div class="panel">
+      <div class="panel" id="send-panel">
         <h2>Send</h2>
         <form id="send-form" class="stack">
           <div class="row">
@@ -284,11 +285,11 @@ const WEB_UI_HTML = `<!doctype html>
           </div>
         </form>
       </div>
-      <div class="panel">
+      <div class="panel" id="members-panel">
         <h2>Actas</h2>
         <div id="members" class="empty"></div>
       </div>
-      <div class="panel">
+      <div class="panel" id="instruction-panel">
         <h2>Role Instruction</h2>
         <form id="instruction-form" class="stack">
           <div id="instruction-target" class="status">No role selected</div>
@@ -325,8 +326,12 @@ const WEB_UI_HTML = `<!doctype html>
       archiveView: document.querySelector("#archive-view"),
       archiveList: document.querySelector("#archive-list"),
       workspaceView: document.querySelector("#workspace-view"),
+      sendPanel: document.querySelector("#send-panel"),
+      membersPanel: document.querySelector("#members-panel"),
+      instructionPanel: document.querySelector("#instruction-panel"),
     };
     const archiveMode = location.pathname === "/archive";
+    const allMode = location.pathname === "/all";
 
     function headers(extra = {}) {
       const base = { ...extra };
@@ -380,6 +385,15 @@ const WEB_UI_HTML = `<!doctype html>
       return name + " · " + project.team + " · " + project.roles + " actas" + clients;
     }
 
+    function messageProjectLabel(message) {
+      if (!message.project_id) return "Unassigned";
+      const project = state.projects.find((candidate) => candidate.team === message.team && candidate.project_id === message.project_id);
+      if (project) return projectLabel(project);
+      const key = message.project_key || "";
+      if (key.startsWith("git:")) return basename(key.slice(4)).replace(/\\.git$/, "");
+      return basename(message.project_path || message.project_id);
+    }
+
     function matchesSelectedProject(client) {
       if (!state.selectedProject) return false;
       const identity = client.project_key || client.project || "";
@@ -427,13 +441,22 @@ const WEB_UI_HTML = `<!doctype html>
       const previous = projectIdentity(state.selectedProject);
       const data = await api("/api/v1/projects" + (archived ? "?archived=1" : ""));
       state.projects = data.projects || [];
-      state.selectedProject = state.projects.find((project) => projectIdentity(project) === previous) || state.projects[0] || null;
+      state.selectedProject = allMode ? null : state.projects.find((project) => projectIdentity(project) === previous) || state.projects[0] || null;
       renderProjects();
     }
 
     function renderProjects() {
       els.project.replaceChildren();
       els.archiveProject.disabled = archiveMode || !state.selectedProject;
+      if (allMode) {
+        const option = document.createElement("option");
+        option.value = "__all__";
+        option.textContent = "All projects";
+        option.selected = true;
+        els.project.append(option);
+        els.project.disabled = true;
+        return;
+      }
       if (state.projects.length === 0) {
         const option = document.createElement("option");
         option.value = "";
@@ -579,14 +602,22 @@ const WEB_UI_HTML = `<!doctype html>
     async function loadHistory() {
       els.messages.replaceChildren();
       const team = selectedTeam();
-      if (!team) {
+      if (!allMode && !team) {
         const empty = document.createElement("div");
         empty.className = "empty";
         empty.textContent = "No messages";
         els.messages.append(empty);
         return;
       }
-      const data = await api("/api/v1/messages/history?team=" + encodeURIComponent(team) + "&limit=100");
+      const params = new URLSearchParams();
+      params.set("limit", "100");
+      if (!allMode) {
+        params.set("team", team);
+        if (state.selectedProject?.project_id) {
+          params.set("project_id", state.selectedProject.project_id);
+        }
+      }
+      const data = await api("/api/v1/messages/history?" + params.toString());
       const messages = data.messages || [];
       if (messages.length === 0) {
         const empty = document.createElement("div");
@@ -601,7 +632,9 @@ const WEB_UI_HTML = `<!doctype html>
         const head = document.createElement("div");
         head.className = "message-head";
         const route = document.createElement("span");
-        route.textContent = message.from_agent + " -> " + message.to_agent;
+        route.textContent = allMode
+          ? messageProjectLabel(message) + " · " + message.team + " · " + message.from_agent + " -> " + message.to_agent
+          : message.from_agent + " -> " + message.to_agent;
         const time = document.createElement("span");
         time.textContent = message.created_at + (message.read ? " read" : " unread");
         const body = document.createElement("div");
@@ -627,10 +660,15 @@ const WEB_UI_HTML = `<!doctype html>
       try {
         els.archiveView.classList.toggle("hidden", !archiveMode);
         els.workspaceView.classList.toggle("hidden", archiveMode);
-        els.archiveProject.classList.toggle("hidden", archiveMode);
+        els.archiveProject.classList.toggle("hidden", archiveMode || allMode);
+        els.sendPanel.classList.toggle("hidden", allMode);
+        els.membersPanel.classList.toggle("hidden", allMode);
+        els.instructionPanel.classList.toggle("hidden", allMode);
         await loadProjects(archiveMode);
         if (archiveMode) {
           renderArchive();
+        } else if (allMode) {
+          await loadHistory();
         } else {
           await refreshSelected();
         }
@@ -690,6 +728,9 @@ const WEB_UI_HTML = `<!doctype html>
             from_agent: els.from.value.trim(),
             to_agent: els.to.value.trim(),
             body: els.body.value,
+            project_id: state.selectedProject?.project_id || null,
+            project_key: state.selectedProject?.project_key || null,
+            project_path: state.selectedProject?.project_path || null,
           }),
         });
         els.body.value = "";
@@ -764,6 +805,10 @@ function initDb(path) {
       from_agent TEXT NOT NULL,
       to_agent TEXT NOT NULL,
       body TEXT NOT NULL,
+      project_id TEXT,
+      project_key TEXT,
+      project_path TEXT,
+      from_client_id TEXT,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       read_at TEXT
     );
@@ -773,6 +818,8 @@ function initDb(path) {
       WHERE read_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_history
       ON messages(team, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_messages_project
+      ON messages(team, project_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS message_reads (
       message_id INTEGER NOT NULL,
@@ -801,8 +848,26 @@ function initDb(path) {
       FOREIGN KEY (team) REFERENCES teams(name) ON DELETE CASCADE
     );
   `);
+  ensureMessagesProjectColumns(db);
   ensureRegistrationsTable(db);
   return db;
+}
+
+function ensureMessagesProjectColumns(db) {
+  const columns = db.prepare('PRAGMA table_info(messages)').all().map((row) => row.name);
+  const addColumn = (name, type) => {
+    if (!columns.includes(name)) {
+      db.exec(`ALTER TABLE messages ADD COLUMN ${name} ${type}`);
+    }
+  };
+  addColumn('project_id', 'TEXT');
+  addColumn('project_key', 'TEXT');
+  addColumn('project_path', 'TEXT');
+  addColumn('from_client_id', 'TEXT');
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_messages_project
+      ON messages(team, project_id, created_at DESC);
+  `);
 }
 
 function createRegistrationsTable(db) {
@@ -946,6 +1011,10 @@ function messageRow(row) {
     from_agent: row.from_agent,
     to_agent: row.to_agent,
     body: row.body,
+    project_id: row.project_id || null,
+    project_key: row.project_key || null,
+    project_path: row.project_path || null,
+    from_client_id: row.from_client_id || null,
     created_at: row.created_at,
     read_at: row.read_at,
     read: row.read_at !== null,
@@ -967,7 +1036,7 @@ function createHandler({ db, token, verbose }) {
       console.error(`${req.method} ${url.pathname}`);
     }
 
-    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/archive')) {
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/all' || url.pathname === '/archive')) {
       htmlResponse(res, 200, WEB_UI_HTML);
       return;
     }
@@ -1057,11 +1126,16 @@ async function handleSend(req, res, db) {
     return;
   }
 
+  const projectId = payload.project_id || payload.project_key || null;
+  const projectKey = payload.project_key || null;
+  const projectPath = payload.project_path || null;
+  const fromClientId = payload.from_client_id || null;
+
   const row = db.prepare(`
-    INSERT INTO messages (team, from_agent, to_agent, body)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO messages (team, from_agent, to_agent, body, project_id, project_key, project_path, from_client_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     RETURNING id, created_at
-  `).get(payload.team, payload.from_agent, payload.to_agent, payload.body);
+  `).get(payload.team, payload.from_agent, payload.to_agent, payload.body, projectId, projectKey, projectPath, fromClientId);
 
   jsonResponse(res, 201, row);
 }
@@ -1070,22 +1144,28 @@ function handleUnread(url, res, db) {
   const team = url.searchParams.get('team') || '';
   const agent = url.searchParams.get('agent') || '';
   const clientId = url.searchParams.get('client_id') || '';
+  const projectId = url.searchParams.get('project_id') || '';
   const limit = intParam(url.searchParams.get('limit'), 100);
   if (!team || !agent || !clientId) {
     errorResponse(res, 400, 'missing_field', 'team, agent, and client_id are required');
     return;
   }
 
+  const projectClause = projectId ? 'AND m.project_id = ?' : '';
+  const params = projectId
+    ? [clientId, team, agent, projectId, limit]
+    : [clientId, team, agent, limit];
   const rows = db.prepare(`
     SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, mr.read_at
+         , m.project_id, m.project_key, m.project_path, m.from_client_id
     FROM messages m
     LEFT JOIN message_reads mr
       ON mr.message_id = m.id
      AND mr.client_id = ?
-    WHERE m.team = ? AND m.to_agent = ? AND mr.message_id IS NULL
+    WHERE m.team = ? AND m.to_agent = ? ${projectClause} AND mr.message_id IS NULL
     ORDER BY m.created_at ASC, m.id ASC
     LIMIT ?
-  `).all(clientId, team, agent, limit);
+  `).all(...params);
 
   jsonResponse(res, 200, { messages: rows.map(messageRow) });
 }
@@ -1154,52 +1234,45 @@ function handleHistory(url, res, db) {
   const team = url.searchParams.get('team') || '';
   const agent = url.searchParams.get('agent') || '';
   const clientId = url.searchParams.get('client_id') || '';
+  const projectId = url.searchParams.get('project_id') || '';
   const limit = intParam(url.searchParams.get('limit'), 20);
-  if (!team) {
-    errorResponse(res, 400, 'missing_field', 'team is required');
-    return;
-  }
 
-  let rows;
-  if (agent && clientId) {
-    rows = db.prepare(`
-      SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, mr.read_at
-      FROM messages m
-      LEFT JOIN message_reads mr
-        ON mr.message_id = m.id
-       AND mr.client_id = ?
-      WHERE m.team = ? AND (m.from_agent = ? OR m.to_agent = ?)
-      ORDER BY m.created_at DESC, m.id DESC
-      LIMIT ?
-    `).all(clientId, team, agent, agent, limit);
-  } else if (clientId) {
-    rows = db.prepare(`
-      SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, mr.read_at
-      FROM messages m
-      LEFT JOIN message_reads mr
-        ON mr.message_id = m.id
-       AND mr.client_id = ?
-      WHERE m.team = ?
-      ORDER BY m.created_at DESC, m.id DESC
-      LIMIT ?
-    `).all(clientId, team, limit);
-  } else if (agent) {
-    rows = db.prepare(`
-      SELECT id, team, from_agent, to_agent, body, created_at, read_at
-      FROM messages
-      WHERE team = ? AND (from_agent = ? OR to_agent = ?)
-      ORDER BY created_at DESC, id DESC
-      LIMIT ?
-    `).all(team, agent, agent, limit);
-  } else {
-    rows = db.prepare(`
-      SELECT id, team, from_agent, to_agent, body, created_at, read_at
-      FROM messages
-      WHERE team = ?
-      ORDER BY created_at DESC, id DESC
-      LIMIT ?
-    `).all(team, limit);
+  const conditions = [];
+  const params = [];
+  if (team) {
+    conditions.push('m.team = ?');
+    params.push(team);
   }
+  if (agent) {
+    conditions.push('(m.from_agent = ? OR m.to_agent = ?)');
+    params.push(agent, agent);
+  }
+  if (projectId) {
+    conditions.push('m.project_id = ?');
+    params.push(projectId);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const rows = clientId
+    ? db.prepare(`
+        SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, mr.read_at,
+               m.project_id, m.project_key, m.project_path, m.from_client_id
+        FROM messages m
+        LEFT JOIN message_reads mr
+          ON mr.message_id = m.id
+         AND mr.client_id = ?
+        ${where}
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT ?
+      `).all(clientId, ...params, limit)
+    : db.prepare(`
+        SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, m.read_at,
+               m.project_id, m.project_key, m.project_path, m.from_client_id
+        FROM messages m
+        ${where}
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT ?
+      `).all(...params, limit);
 
   jsonResponse(res, 200, { messages: rows.reverse().map(messageRow) });
 }

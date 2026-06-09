@@ -54,6 +54,7 @@ wait_for_http() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "<title>agmsgd</title>" ]]
   [[ "$output" =~ 'id="project"' ]]
+  [[ "$output" =~ 'href="/all"' ]]
   [[ "$output" =~ "Bearer token" ]]
   [[ "$output" =~ "/api/v1/projects" ]]
   [[ "$output" =~ 'href="/archive"' ]]
@@ -69,6 +70,10 @@ wait_for_http() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Archive" ]]
   [[ "$output" =~ 'id="archive-list"' ]]
+
+  run curl -fsS "$SERVER_URL/all"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "All projects" ]]
 }
 
 @test "remote storage: env-selected send, inbox, read, and history roundtrip" {
@@ -269,6 +274,41 @@ wait_for_http() {
   [[ "$output" =~ "remote delayed" ]]
 }
 
+@test "remote storage: project metadata scopes unread and history" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/send.sh" testteam alice bob "remote project a" --project /tmp/remote-project-a
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/send.sh" testteam alice bob "remote project b" --project /tmp/remote-project-b
+  [ "$status" -eq 0 ]
+
+  project_a_key="$(AGMSG_HUB_HOME="$TEST_SKILL_DIR" bash -c 'source "$1"; source "$2"; agmsg_project_key /tmp/remote-project-a' _ "$SCRIPTS/lib/storage.sh" "$SCRIPTS/lib/client.sh")"
+  project_b_key="$(AGMSG_HUB_HOME="$TEST_SKILL_DIR" bash -c 'source "$1"; source "$2"; agmsg_project_key /tmp/remote-project-b' _ "$SCRIPTS/lib/storage.sh" "$SCRIPTS/lib/client.sh")"
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/inbox.sh" testteam bob --project /tmp/remote-project-a
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "remote project a" ]]
+  [[ ! "$output" =~ "remote project b" ]]
+
+  run curl -fsS -G "$SERVER_URL/api/v1/messages/history" \
+    --data-urlencode team=testteam \
+    --data-urlencode "project_id=$project_a_key" \
+    --data-urlencode limit=20
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "remote project a" ]]
+  [[ ! "$output" =~ "remote project b" ]]
+
+  run curl -fsS -G "$SERVER_URL/api/v1/messages/history" \
+    --data-urlencode limit=20
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "remote project a" ]]
+  [[ "$output" =~ "remote project b" ]]
+  [[ "$output" =~ "$project_a_key" ]]
+  [[ "$output" =~ "$project_b_key" ]]
+}
+
 @test "remote storage: check-inbox uses remote unread messages" {
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
     AGMSG_CLIENT_ID=hook-client \
@@ -276,7 +316,8 @@ wait_for_http() {
   [ "$status" -eq 0 ]
 
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
-    bash "$SCRIPTS/send.sh" testteam alice reviewer "hook remote message"
+    AGMSG_CLIENT_ID=hook-client \
+    bash "$SCRIPTS/send.sh" testteam alice reviewer "hook remote message" --project /tmp/hook-proj
   [ "$status" -eq 0 ]
 
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \

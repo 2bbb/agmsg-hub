@@ -17,12 +17,17 @@ CREATE TABLE messages (
   from_agent TEXT NOT NULL,
   to_agent TEXT NOT NULL,
   body TEXT NOT NULL,
+  project_id TEXT,
+  project_key TEXT,
+  project_path TEXT,
+  from_client_id TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   read_at TEXT
 );
 
 CREATE INDEX idx_unread ON messages(team, to_agent, read_at) WHERE read_at IS NULL;
 CREATE INDEX idx_history ON messages(team, created_at DESC);
+CREATE INDEX idx_messages_project ON messages(team, project_id, created_at DESC);
 
 CREATE TABLE message_reads (
   message_id INTEGER NOT NULL,

@@ -125,7 +125,7 @@ while IFS=$'\t' read -r team agent; do
   fi
 
   CHECKED=1
-  if ! RESULT="$("$SCRIPT_DIR/inbox.sh" "$team" "$agent" --quiet 2>&1)"; then
+  if ! RESULT="$("$SCRIPT_DIR/inbox.sh" "$team" "$agent" --quiet --project "$PROJECT" 2>&1)"; then
     OUTPUT+="agmsg inbox check failed for $team/$agent:"$'\n'
     OUTPUT+="$RESULT"$'\n\n'
     continue

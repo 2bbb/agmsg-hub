@@ -114,13 +114,13 @@ Five possible outputs:
 Then continue with the user's subcommand. This catches the case where the user invokes `/__SKILL_NAME__` as the first prompt before the SessionStart-hook directive has been acted on.
 
 **If no arguments provided (DEFAULT action — always do this when the command is invoked without arguments):**
-1. **IMMEDIATELY** run inbox check for each TEAM: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT`
+1. **IMMEDIATELY** run inbox check for each TEAM: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT --project "$(pwd)"`
 2. Do NOT ask the user what to do — just run the inbox check.
 3. If there are messages, read and respond appropriately. To reply:
-   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
+   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>" --project "$(pwd)"`
 
 If argument is "history":
-1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/history.sh $TEAM $AGENT`
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/history.sh $TEAM $AGENT 20 --project "$(pwd)"`
 
 If argument is "team":
 1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/team.sh $TEAM`
@@ -144,7 +144,7 @@ If argument is "instruction update", "instructions update", "instruction sync", 
 If argument starts with "send" (e.g. "send misaki check the server"):
 1. Parse target agent and message from the arguments
 2. Determine which team the target agent belongs to, then run:
-   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
+   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>" --project "$(pwd)"`
 
 If argument starts with "actas" followed by an agent name (e.g. "actas alice"):
 1. Parse the new role name.

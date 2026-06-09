@@ -59,7 +59,7 @@ teardown() {
   bash "$SCRIPTS/join.sh" testteam alice claude-code "$project"
 
   # A message addressed to alice lives only in the overridden store.
-  AGMSG_STORAGE_PATH="$store" bash "$SCRIPTS/send.sh" testteam bob alice "via override store"
+  AGMSG_STORAGE_PATH="$store" bash "$SCRIPTS/send.sh" testteam bob alice "via override store" --project "$project"
 
   # Simulate a clean install whose default hub db dir never existed.
   rm -rf "$TEST_SKILL_DIR/db"

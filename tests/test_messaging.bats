@@ -66,6 +66,20 @@ teardown() {
   [[ "$output" =~ "per-client read" ]]
 }
 
+@test "inbox: --project scopes unread messages to that project" {
+  bash "$SCRIPTS/send.sh" testteam alice bob "for project a" --project /tmp/project-a
+  bash "$SCRIPTS/send.sh" testteam alice bob "for project b" --project /tmp/project-b
+
+  run bash "$SCRIPTS/inbox.sh" testteam bob --project /tmp/project-a
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "for project a" ]]
+  [[ ! "$output" =~ "for project b" ]]
+
+  run bash "$SCRIPTS/inbox.sh" testteam bob --project /tmp/project-b
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "for project b" ]]
+}
+
 @test "inbox: --quiet suppresses output when no messages" {
   run bash "$SCRIPTS/inbox.sh" testteam alice --quiet
   [ "$status" -eq 0 ]
@@ -137,6 +151,21 @@ line"
   run bash "$SCRIPTS/history.sh" testteam alice
   [ "$status" -eq 0 ]
   [[ "$output" =~ "for" ]]
+}
+
+@test "history: --project scopes history to that project" {
+  bash "$SCRIPTS/send.sh" testteam alice bob "history project a" --project /tmp/project-a
+  bash "$SCRIPTS/send.sh" testteam alice bob "history project b" --project /tmp/project-b
+
+  run bash "$SCRIPTS/history.sh" testteam "" 20 --project /tmp/project-a
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "history project a" ]]
+  [[ ! "$output" =~ "history project b" ]]
+
+  run bash "$SCRIPTS/history.sh" testteam --project /tmp/project-a
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "history project a" ]]
+  [[ ! "$output" =~ "history project b" ]]
 }
 
 @test "history: respects limit" {

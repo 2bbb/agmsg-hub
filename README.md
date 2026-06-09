@@ -84,7 +84,22 @@ After install, **restart your agent** (Claude Code / Codex / Gemini CLI / Antigr
 
 ## Join a Team
 
-Agents join teams by **identity**: `(agent name, team)`. Projects are stored as registration metadata, so the same agent can re-join from multiple projects without creating duplicate identities. The easiest way:
+agmsg separates **team**, **project**, **role**, and **client**:
+
+- **Team**: the collaboration group, such as `nozzle-org`.
+- **Project**: the work target inside a team, such as one repo or local workspace.
+- **Role / agent name**: the address inside a project, such as `planner`, `implementer`, or `reviewer`.
+- **Client**: one installed skill/runtime, identified by `~/.agmsg-hub/client_id`.
+
+Runtime messages are scoped to **`team + project + role`**. Registrations say
+which client participates in which team/project/role. Older messages created
+before project-scoped messages have no project metadata and appear as
+`Unassigned` in `/all`; they are not shown in an individual project's history.
+
+Agents join teams by **identity**: `(agent name, team)` plus the current project
+registration. The same agent can re-join from multiple projects without creating
+duplicate role identities, but new messages sent from a project are tagged with
+that project. The easiest way:
 
 1. Open Claude Code in your project
 2. Run `/<cmd>` (e.g. `/agmsg`)
@@ -169,11 +184,11 @@ agmsg follows a **one CC session = one active role** model for Claude Code Monit
 - **Without `actas`**: the watcher subscribes to whichever `(team, agent)` pairs were registered for this `(client_id, project_path, agent_type)` at the moment `watch.sh` started, *minus* any pair currently locked by another live session's `actas` claim. The set is *not* re-resolved later — a peer that claims a name after this watcher launched will start receiving exclusively, but this watcher won't notice the loss until it restarts. A role joined mid-session via `actas` from another CC does *not* start arriving in CCs that were launched before it.
 - **After `actas <name>`**: the watcher is relaunched filtered to `<name>` only, and the lock that filter implies prevents peer watchers from ever subscribing to `<name>` while this session is live.
 
-Watchers poll unread messages using per-client read receipts. Starting or restarting a watcher does not skip unread backlog for that client; a message is marked read only after the watcher prints it.
+Watchers poll unread messages for the current project using per-client read receipts. Starting or restarting a watcher does not skip unread backlog for that client; a message is marked read only after the watcher prints it.
 
 This is intentional: it keeps each CC bound to one role's inbox, so a `tech-lead` window stays clear of `biz-analyst` traffic and vice versa, and the exclusivity holds across sessions on the same machine rather than per-session. To pick up a role added after a CC launched (without switching to it exclusively), restart the CC or `/clear` so SessionStart re-launches `watch.sh` with the fresh identity list — and with the up-to-date lock view.
 
-The send side mirrors this: every `send.sh` call from this CC uses the active role as the `from` agent, whether that's the implicit one (default) or the one set by the most recent `actas`.
+The send side mirrors this: every skill-driven `send.sh` call from this session uses the active role as the `from` agent and tags the message with the current project.
 
 ### Reusing the same identity across projects
 
@@ -287,10 +302,10 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 ### Shell (any agent)
 
 ```bash
-~/.agents/skills/<cmd>/scripts/send.sh <team> <from> <to> "<message>"
-~/.agents/skills/<cmd>/scripts/inbox.sh <team> <agent_id>
-~/.agents/skills/<cmd>/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2
-~/.agents/skills/<cmd>/scripts/history.sh <team> [agent_id] [limit]
+~/.agents/skills/<cmd>/scripts/send.sh <team> <from> <to> "<message>" [--project <path>]
+~/.agents/skills/<cmd>/scripts/inbox.sh <team> <agent_id> [--project <path>]
+~/.agents/skills/<cmd>/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2 [--project <path>]
+~/.agents/skills/<cmd>/scripts/history.sh <team> [agent_id] [limit] [--project <path>]
 ~/.agents/skills/<cmd>/scripts/team.sh <team>
 ~/.agents/skills/<cmd>/scripts/role-instructions.sh get <team> <agent>
 ~/.agents/skills/<cmd>/scripts/role-instructions.sh set <team> <agent> "<instruction>"
@@ -320,6 +335,8 @@ cd agmsg-hub
 The same server also exposes a small browser dashboard at
 `http://127.0.0.1:8787/` for selecting a project, checking history, sending
 test messages, selecting actas roles, and editing role instructions.
+Use `http://127.0.0.1:8787/all` for a team-wide/project-wide history view;
+messages without project metadata are shown there as `Unassigned`.
 
 By default, every server process uses the same DB resolved by `agmsg_db_path`
 (`~/.agmsg-hub/db/messages.db`, unless `AGMSG_HUB_HOME` or `AGMSG_STORAGE_PATH`

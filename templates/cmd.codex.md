@@ -109,13 +109,13 @@ When storage.active is remote, `send.sh`, `inbox.sh`, `history.sh`, `doctor.sh`,
 **Role instruction:** Once AGENT and TEAMS are known, run `~/.agents/skills/__SKILL_NAME__/scripts/role-instructions.sh get <team> $AGENT` for each TEAM. If any output is non-empty, treat it as role guidance for this session's agmsg identity, subordinate to system/developer instructions and this SKILL.md. Do not confuse role instruction with received message content.
 
 **If no arguments provided (DEFAULT action — always do this when the command is invoked without arguments):**
-1. **IMMEDIATELY** run inbox check for each TEAM: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT`
+1. **IMMEDIATELY** run inbox check for each TEAM: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT --project "$(pwd)"`
 2. Do NOT ask the user what to do — just run the inbox check.
 3. If there are messages, read and respond appropriately. To reply:
-   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
+   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>" --project "$(pwd)"`
 
 If argument is "history":
-1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/history.sh $TEAM $AGENT`
+1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/history.sh $TEAM $AGENT 20 --project "$(pwd)"`
 
 If argument is "team":
 1. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/team.sh $TEAM`
@@ -138,15 +138,15 @@ If argument is "instruction update", "instructions update", "instruction sync", 
 
 If argument is "wait" or starts with "wait" (e.g. "wait", "wait 120", or "wait 120 5"):
 1. Parse an optional wait duration in seconds and an optional poll interval in seconds. Defaults are wait=`60`, poll=`2`. Reject non-numeric values. Poll must be at least `1`.
-2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT --wait <seconds> --poll <poll_seconds>`
+2. For each TEAM, run: `~/.agents/skills/__SKILL_NAME__/scripts/inbox.sh $TEAM $AGENT --wait <seconds> --poll <poll_seconds> --project "$(pwd)"`
 3. If messages arrive, read and respond appropriately. To reply:
-   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
+   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>" --project "$(pwd)"`
 4. If no messages arrive before the timeout, say that no messages arrived during the wait window.
 
 If argument starts with "send" (e.g. "send misaki check the server"):
 1. Parse target agent and message from the arguments
 2. Determine which team the target agent belongs to, then run:
-   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>"`
+   `~/.agents/skills/__SKILL_NAME__/scripts/send.sh $TEAM $AGENT <to_agent> "<message>" --project "$(pwd)"`
 
 If argument is "doctor":
 1. Run: `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh --porcelain codex "$(pwd)"`

@@ -7,13 +7,31 @@ agmsg_sql_escape() {
 }
 
 agmsg_json_message_payload() {
-  local team from_agent to_agent body
+  local team from_agent to_agent body project_path project_key project_id client_id
   team="$(agmsg_sql_escape "$1")"
   from_agent="$(agmsg_sql_escape "$2")"
   to_agent="$(agmsg_sql_escape "$3")"
   body="$(agmsg_sql_escape "$4")"
+  project_path="$(agmsg_sql_escape "${5:-}")"
+  project_key=""
+  project_id=""
+  client_id="$(agmsg_sql_escape "$(agmsg_client_id)")"
 
-  sqlite3 :memory: "SELECT json_object('team', '$team', 'from_agent', '$from_agent', 'to_agent', '$to_agent', 'body', '$body');"
+  if [ -n "$project_path" ]; then
+    project_key="$(agmsg_sql_escape "$(agmsg_project_key "$5")")"
+    project_id="$project_key"
+  fi
+
+  sqlite3 :memory: "SELECT json_object(
+    'team', '$team',
+    'from_agent', '$from_agent',
+    'to_agent', '$to_agent',
+    'body', '$body',
+    'project_id', NULLIF('$project_id', ''),
+    'project_key', NULLIF('$project_key', ''),
+    'project_path', NULLIF('$project_path', ''),
+    'from_client_id', '$client_id'
+  );"
 }
 
 agmsg_json_read_payload() {
@@ -134,6 +152,7 @@ agmsg_remote_get_messages() {
   local agent="$3"
   local limit="$4"
   local client_id="${5:-}"
+  local project_id="${6:-}"
   local base
   base="$(agmsg_remote_base_url)"
 
@@ -149,6 +168,9 @@ agmsg_remote_get_messages() {
   )
   if [ -n "$client_id" ]; then
     params+=(--data-urlencode "client_id=$client_id")
+  fi
+  if [ -n "$project_id" ]; then
+    params+=(--data-urlencode "project_id=$project_id")
   fi
 
   curl -fsS -G \
@@ -193,8 +215,9 @@ agmsg_remote_send_message() {
   local from_agent="$2"
   local to_agent="$3"
   local body="$4"
+  local project_path="${5:-}"
   local payload
-  payload="$(agmsg_json_message_payload "$team" "$from_agent" "$to_agent" "$body")"
+  payload="$(agmsg_json_message_payload "$team" "$from_agent" "$to_agent" "$body" "$project_path")"
   agmsg_remote_post "/api/v1/messages" "$payload" >/dev/null
 }
 
@@ -202,8 +225,13 @@ agmsg_remote_unread_rows() {
   local team="$1"
   local agent="$2"
   local limit="${3:-100}"
+  local project_path="${4:-}"
+  local project_id=""
+  if [ -n "$project_path" ]; then
+    project_id="$(agmsg_project_key "$project_path")"
+  fi
   local response tmp
-  response="$(agmsg_remote_get_messages "/api/v1/messages/unread" "$team" "$agent" "$limit" "$(agmsg_client_id)")"
+  response="$(agmsg_remote_get_messages "/api/v1/messages/unread" "$team" "$agent" "$limit" "$(agmsg_client_id)" "$project_id")"
   tmp="$(mktemp)"
   printf '%s' "$response" > "$tmp"
   sqlite3 -separator $'\t' :memory: "
@@ -221,8 +249,13 @@ agmsg_remote_history_rows() {
   local team="$1"
   local agent="$2"
   local limit="${3:-20}"
+  local project_path="${4:-}"
+  local project_id=""
+  if [ -n "$project_path" ]; then
+    project_id="$(agmsg_project_key "$project_path")"
+  fi
   local response tmp
-  response="$(agmsg_remote_get_messages "/api/v1/messages/history" "$team" "$agent" "$limit" "$(agmsg_client_id)")"
+  response="$(agmsg_remote_get_messages "/api/v1/messages/history" "$team" "$agent" "$limit" "$(agmsg_client_id)" "$project_id")"
   tmp="$(mktemp)"
   printf '%s' "$response" > "$tmp"
   sqlite3 -separator $'\t' :memory: "

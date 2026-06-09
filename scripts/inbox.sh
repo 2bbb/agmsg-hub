@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: inbox.sh <team> <agent_id> [--quiet] [--wait seconds] [--poll seconds]
+# Usage: inbox.sh <team> <agent_id> [--quiet] [--wait seconds] [--poll seconds] [--project path]
 # Shows unread messages and marks them as read.
 # --quiet: only output if there are unread messages (for hooks)
 # --wait: poll until messages arrive or the timeout elapses
@@ -14,6 +14,7 @@ shift 2
 QUIET=false
 WAIT_SECONDS=0
 POLL_SECONDS=2
+PROJECT_PATH=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -27,6 +28,10 @@ while [ $# -gt 0 ]; do
       ;;
     --poll)
       POLL_SECONDS="${2:?Usage: inbox.sh <team> <agent_id> [--quiet] [--wait seconds] [--poll seconds]}"
+      shift 2
+      ;;
+    --project)
+      PROJECT_PATH="${2:?Usage: inbox.sh <team> <agent_id> [--quiet] [--wait seconds] [--poll seconds] [--project path]}"
       shift 2
       ;;
     *)
@@ -57,6 +62,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
 source "$SCRIPT_DIR/lib/client.sh"
 CLIENT_ID="$(agmsg_client_id)"
+PROJECT_ID=""
+if [ -n "$PROJECT_PATH" ]; then
+  PROJECT_ID="$(agmsg_project_key "$PROJECT_PATH")"
+fi
 
 REMOTE=false
 if agmsg_using_remote_storage; then
@@ -69,6 +78,18 @@ fi
 ensure_read_receipts_table() {
   [ -f "$DB" ] || return 0
   sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN project_id TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN project_key TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN project_path TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
+    ALTER TABLE messages ADD COLUMN from_client_id TEXT;
+  " 2>/dev/null || true
+  sqlite3 "$DB" "
     CREATE TABLE IF NOT EXISTS message_reads (
       message_id INTEGER NOT NULL,
       team TEXT NOT NULL,
@@ -79,12 +100,14 @@ ensure_read_receipts_table() {
     );
     CREATE INDEX IF NOT EXISTS idx_message_reads_inbox
       ON message_reads(team, agent, client_id, message_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_project
+      ON messages(team, project_id, created_at DESC);
   "
 }
 
 fetch_unread() {
   if [ "$REMOTE" = true ]; then
-    agmsg_remote_unread_rows "$TEAM" "$AGENT" 100
+    agmsg_remote_unread_rows "$TEAM" "$AGENT" 100 "$PROJECT_PATH"
     return
   fi
 
@@ -92,6 +115,11 @@ fetch_unread() {
     return 0
   fi
   ensure_read_receipts_table
+
+  local project_filter=""
+  if [ -n "$PROJECT_ID" ]; then
+    project_filter="AND m.project_id='$(printf '%s' "$PROJECT_ID" | sed "s/'/''/g")'"
+  fi
 
   sqlite3 -separator $'\t' "$DB" "
     SELECT
@@ -105,6 +133,7 @@ fetch_unread() {
      AND mr.client_id = '$(printf '%s' "$CLIENT_ID" | sed "s/'/''/g")'
     WHERE m.team='$TEAM'
       AND m.to_agent='$AGENT'
+      $project_filter
       AND mr.message_id IS NULL
     ORDER BY m.created_at ASC, m.id ASC;
   "

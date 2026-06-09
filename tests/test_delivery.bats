@@ -613,7 +613,7 @@ JSON
   bash "$SCRIPTS/join.sh" testteam bob   copilot "$TEST_PROJECT"
   # Push cooldown window into the past so the first invocation is not skipped.
   bash "$SCRIPTS/config.sh" set delivery.turn.check_interval 0 >/dev/null
-  bash "$SCRIPTS/send.sh" testteam bob alice "ping copilot"
+  bash "$SCRIPTS/send.sh" testteam bob alice "ping copilot" --project "$TEST_PROJECT"
   run bash -c "echo '{}' | bash '$SCRIPTS/check-inbox.sh' copilot '$TEST_PROJECT'"
   [ "$status" -eq 0 ]
   [[ "$output" =~ "\"decision\": \"block\"" ]]
@@ -637,18 +637,13 @@ JSON
   }
 }
 JSON
-  # Insert two messages, one for each agent.
-  DB="$TEST_SKILL_DIR/db/messages.db"
-  sqlite3 "$DB" "INSERT INTO messages (team, from_agent, to_agent, body) VALUES ('myteam', 'system', 'alice', 'for-alice');"
-  sqlite3 "$DB" "INSERT INTO messages (team, from_agent, to_agent, body) VALUES ('myteam', 'system', 'bob', 'for-bob');"
-
   AGMSG_WATCH_INTERVAL=1 bash "$SCRIPTS/watch.sh" t-sid "$TEST_PROJECT" claude-code bob > /tmp/agmsg-as-bob 2>&1 &
   local pid=$!
-  # High-water-mark = MAX(id) at startup, so prior messages aren't replayed.
-  # Insert NEW messages and wait for several poll iterations.
+  # Insert messages after the watcher starts. watch.sh now reads unread
+  # project-scoped messages rather than relying on an id high-water mark.
   sleep 1
-  sqlite3 "$DB" "INSERT INTO messages (team, from_agent, to_agent, body) VALUES ('myteam', 'system', 'alice', 'new-for-alice');"
-  sqlite3 "$DB" "INSERT INTO messages (team, from_agent, to_agent, body) VALUES ('myteam', 'system', 'bob', 'new-for-bob');"
+  bash "$SCRIPTS/send.sh" myteam system alice "new-for-alice" --project "$TEST_PROJECT"
+  bash "$SCRIPTS/send.sh" myteam system bob "new-for-bob" --project "$TEST_PROJECT"
   sleep 3
   kill -TERM "$pid" 2>/dev/null
   wait "$pid" 2>/dev/null || true
@@ -735,8 +730,6 @@ JSON
   cat > "$TEST_SKILL_DIR/teams/myteam/config.json" <<JSON
 {"name":"myteam","agents":{"alice":{"registrations":[{"type":"claude-code","project":"$TEST_PROJECT"}]}}}
 JSON
-  DB="$TEST_SKILL_DIR/db/messages.db"
-
   # Watcher starts with only `alice` registered. Default subscription set
   # is resolved at launch and not re-evaluated each poll.
   AGMSG_WATCH_INTERVAL=1 bash "$SCRIPTS/watch.sh" t-static "$TEST_PROJECT" claude-code > /tmp/agmsg-static 2>&1 &
@@ -746,10 +739,10 @@ JSON
   # Join `bob` to the same (project, type) after the watcher is running.
   bash "$SCRIPTS/join.sh" myteam bob claude-code "$TEST_PROJECT"
 
-  # Insert messages for both. alice should arrive (alice was in the original
+  # Send messages for both. alice should arrive (alice was in the original
   # subscription set); bob should NOT arrive (joined after launch).
-  sqlite3 "$DB" "INSERT INTO messages (team, from_agent, to_agent, body) VALUES ('myteam', 'sys', 'alice', 'for-alice-static');"
-  sqlite3 "$DB" "INSERT INTO messages (team, from_agent, to_agent, body) VALUES ('myteam', 'sys', 'bob',   'for-bob-static');"
+  bash "$SCRIPTS/send.sh" myteam sys alice "for-alice-static" --project "$TEST_PROJECT"
+  bash "$SCRIPTS/send.sh" myteam sys bob "for-bob-static" --project "$TEST_PROJECT"
 
   sleep 3
   kill -TERM "$pid" 2>/dev/null
