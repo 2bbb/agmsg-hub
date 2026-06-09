@@ -46,11 +46,34 @@ fi
 if agmsg_using_remote_storage; then
   source "$SCRIPT_DIR/lib/remote-client.sh"
   PAIRS="$(agmsg_remote_identity_pairs "$PROJECT" "$TYPE")"
+  ARCHIVED_PAIRS=""
+  if [ -z "$PAIRS" ]; then
+    ARCHIVED_PAIRS="$(agmsg_remote_archived_identity_pairs "$PROJECT" "$TYPE")"
+  fi
 else
   PAIRS="$("$SCRIPT_DIR/identities.sh" "$PROJECT" "$TYPE")"
+  ARCHIVED_PAIRS=""
 fi
 
 if [ -z "$PAIRS" ]; then
+  if [ -n "$ARCHIVED_PAIRS" ]; then
+    SUMMARY=$(printf '%s\n' "$ARCHIVED_PAIRS" | awk -F'\t' 'NF >= 2 { item=$1 "/" $2; if ($3 != "") item=item " archived_at=" $3; out = out (out ? ", " : "") item } END { print out }')
+    MSG="agmsg: this project registration is archived; inbox checks are disabled for ${SUMMARY}. Restore it from /archive or join again to reactivate."
+    case "$TYPE" in
+      codex|copilot)
+        ESCAPED=$(printf '%s' "$MSG" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        cat <<ENDJSON
+{
+  "decision": "block",
+  "reason": "$ESCAPED"
+}
+ENDJSON
+        ;;
+      *)
+        printf '%s\n' "$MSG"
+        ;;
+    esac
+  fi
   exit 0
 fi
 

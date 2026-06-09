@@ -56,12 +56,19 @@ wait_for_http() {
   [[ "$output" =~ 'id="project"' ]]
   [[ "$output" =~ "Bearer token" ]]
   [[ "$output" =~ "/api/v1/projects" ]]
+  [[ "$output" =~ 'href="/archive"' ]]
+  [[ "$output" =~ 'id="archive-project"' ]]
   [[ "$output" =~ "/api/v1/role-instructions" ]]
   [[ "$output" =~ "History" ]]
   [[ "$output" =~ "Send" ]]
   [[ "$output" =~ "Actas" ]]
   [[ "$output" =~ "Clients" ]]
   [[ ! "$output" =~ "Regs" ]]
+
+  run curl -fsS "$SERVER_URL/archive"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Archive" ]]
+  [[ "$output" =~ 'id="archive-list"' ]]
 }
 
 @test "remote storage: env-selected send, inbox, read, and history roundtrip" {
@@ -279,4 +286,58 @@ wait_for_http() {
   [[ "$output" =~ '"decision": "block"' ]]
   [[ "$output" =~ "testteam/reviewer" ]]
   [[ "$output" =~ "hook remote message" ]]
+}
+
+@test "remote storage: archives project registrations and exposes them under archive" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=archive-client AGMSG_CLIENT_LABEL=archive-host \
+    bash "$SCRIPTS/join.sh" testteam reviewer codex /tmp/archive-proj
+  [ "$status" -eq 0 ]
+
+  run curl -fsS "$SERVER_URL/api/v1/projects"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "archive-proj" ]]
+
+  run curl -fsS -X POST "$SERVER_URL/api/v1/projects/archive" \
+    -H "content-type: application/json" \
+    -d '{"team":"testteam","project_id":"/tmp/archive-proj","archived":true}'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"archived":true' ]]
+  [[ "$output" =~ '"updated":1' ]]
+
+  run curl -fsS "$SERVER_URL/api/v1/projects"
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "archive-proj" ]]
+
+  run curl -fsS "$SERVER_URL/api/v1/projects?archived=1"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "archive-proj" ]]
+  [[ "$output" =~ '"archived_at"' ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=archive-client \
+    bash "$SCRIPTS/whoami.sh" /tmp/archive-proj codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "archived=true" ]]
+  [[ "$output" =~ "agents=reviewer" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=archive-client \
+    bash "$SCRIPTS/check-inbox.sh" codex /tmp/archive-proj
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"decision": "block"' ]]
+  [[ "$output" =~ "project registration is archived" ]]
+
+  run curl -fsS -X POST "$SERVER_URL/api/v1/projects/archive" \
+    -H "content-type: application/json" \
+    -d '{"team":"testteam","project_id":"/tmp/archive-proj","archived":false}'
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"archived":false' ]]
+  [[ "$output" =~ '"updated":1' ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=archive-client \
+    bash "$SCRIPTS/whoami.sh" /tmp/archive-proj codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=reviewer" ]]
 }

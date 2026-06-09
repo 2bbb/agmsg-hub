@@ -386,6 +386,19 @@ every other machine. This matters when two clients intentionally use the same
 `messages.read_at` remains as a compatibility/summary timestamp meaning "first
 read by any client". New unread checks do not use it.
 
+### Archiving Old Projects
+
+The browser UI can archive stale project registration groups. Open the agmsgd UI,
+select a project, then use **Archive**. Archived projects disappear from the
+normal project selector and are shown at `/archive`, where they can be restored.
+
+Archiving marks matching registrations with `archived_at`; it does not delete
+messages, role instructions, or team records. If an agent tries to resolve an
+archived project, `whoami.sh` returns `archived=true`, and turn-mode inbox checks
+surface a clear "project registration is archived" message instead of silently
+doing nothing. Re-running `join.sh` for the same project also reactivates that
+registration.
+
 For anything beyond localhost, put it behind SSH forwarding, VPN, or a real
 authenticated reverse proxy. Do not expose an unauthenticated agmsgd directly
 to the public internet.

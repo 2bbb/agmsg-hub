@@ -20,11 +20,12 @@ The server is managed separately from the agmsg-hub repo with `./server/server.s
 
 ## Identity
 
-If you already know your AGENT and TEAMS from a previous `$__SKILL_NAME__` call in this session, and you have already loaded the role instruction for that AGENT, skip to **Execute** below.
+Run this at the start of every `$__SKILL_NAME__` command, even if you remember AGENT and TEAMS from earlier in the session:
+`~/.agents/skills/__SKILL_NAME__/scripts/whoami.sh "$(pwd)" gemini`
 
-Otherwise, run: `~/.agents/skills/__SKILL_NAME__/scripts/whoami.sh "$(pwd)" gemini`
+Do not skip this preflight. It is how archived project registrations are detected before inbox, history, or send actions.
 
-Four possible outputs:
+Five possible outputs:
 
 **A) Single identity:**
 `agent=<name> teams=<t1,t2,...> type=gemini project=<path>`
@@ -84,6 +85,10 @@ Four possible outputs:
   3. Ask for the team name to join (existing or new).
   4. Run: `~/.agents/skills/__SKILL_NAME__/scripts/join.sh <team> <agent_name> gemini "$(pwd)"`
   5. Then continue with the normal post-join flow above.
+
+**E) Archived registration:**
+`archived=true agents=<n1,n2,...> teams=<t1,t2,...> type=gemini project=<path>`
+→ This project was archived. Do not run `inbox.sh`, `wait`, `history`, or `send.sh` for this project. Tell the user: "This agmsg project registration is archived. Restore it from the agmsgd `/archive` page, or run `join.sh` again to reactivate it."
 
 ## Execute
 

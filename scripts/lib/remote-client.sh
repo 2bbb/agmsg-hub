@@ -317,12 +317,35 @@ agmsg_remote_identity_summary() {
   tmp="$(mktemp)"
   printf '%s' "$response" > "$tmp"
 
-  local exact_count agent_names team_names suggested_agents suggested_teams all_teams
+  local exact_count archived_count agent_names team_names suggested_agents suggested_teams all_teams
   exact_count="$(sqlite3 :memory: "SELECT COUNT(*) FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.exact');")"
+  archived_count="$(sqlite3 :memory: "SELECT COUNT(*) FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.archived_exact');")"
   all_teams="$(sqlite3 -separator ',' :memory: "SELECT GROUP_CONCAT(value) FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.teams');")"
 
   local client_id
   client_id="$(agmsg_client_id)"
+
+  if [ "$exact_count" = "0" ] && [ "$archived_count" != "0" ]; then
+    agent_names="$(sqlite3 -separator ',' :memory: "
+      SELECT GROUP_CONCAT(agent)
+      FROM (
+        SELECT DISTINCT json_extract(value, '$.agent') AS agent
+        FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.archived_exact')
+        ORDER BY agent
+      );
+    ")"
+    team_names="$(sqlite3 -separator ',' :memory: "
+      SELECT GROUP_CONCAT(team)
+      FROM (
+        SELECT DISTINCT json_extract(value, '$.team') AS team
+        FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.archived_exact')
+        ORDER BY team
+      );
+    ")"
+    rm -f "$tmp"
+    echo "archived=true agents=$agent_names teams=$team_names type=$type project=$project client=$client_id available_teams=${all_teams:-none}"
+    return
+  fi
 
   if [ "$exact_count" = "0" ]; then
     suggested_agents="$(sqlite3 -separator ',' :memory: "
@@ -388,6 +411,24 @@ agmsg_remote_identity_pairs() {
   sqlite3 -separator $'\t' :memory: "
     SELECT json_extract(value, '$.team'), json_extract(value, '$.agent')
     FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.exact')
+    ORDER BY 1, 2;
+  "
+  rm -f "$tmp"
+}
+
+agmsg_remote_archived_identity_pairs() {
+  local project="$1"
+  local type="$2"
+  local response tmp
+  response="$(agmsg_remote_get "/api/v1/identities" \
+    --data-urlencode "project=$project" \
+    --data-urlencode "type=$type" \
+    --data-urlencode "client_id=$(agmsg_client_id)")"
+  tmp="$(mktemp)"
+  printf '%s' "$response" > "$tmp"
+  sqlite3 -separator $'\t' :memory: "
+    SELECT json_extract(value, '$.team'), json_extract(value, '$.agent'), COALESCE(json_extract(value, '$.archived_at'), '')
+    FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.archived_exact')
     ORDER BY 1, 2;
   "
   rm -f "$tmp"

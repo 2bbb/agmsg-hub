@@ -89,6 +89,21 @@ const WEB_UI_HTML = `<!doctype html>
       border-color: var(--accent);
       color: white;
     }
+    button.danger {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .hidden { display: none !important; }
     input, textarea, select {
       width: 100%;
       border: 1px solid var(--line);
@@ -107,7 +122,7 @@ const WEB_UI_HTML = `<!doctype html>
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .topbar {
       display: grid;
-      grid-template-columns: minmax(260px, 1fr) minmax(180px, 260px) auto auto;
+      grid-template-columns: minmax(260px, 1fr) minmax(180px, 260px) auto auto auto;
       align-items: end;
       gap: 10px;
     }
@@ -223,6 +238,10 @@ const WEB_UI_HTML = `<!doctype html>
 <body>
   <header>
     <h1>agmsgd</h1>
+    <nav class="nav">
+      <a href="/">Projects</a>
+      <a href="/archive">Archive</a>
+    </nav>
   </header>
   <main class="stack">
     <div class="panel topbar">
@@ -234,8 +253,13 @@ const WEB_UI_HTML = `<!doctype html>
       </label>
       <span id="health" class="status">Checking...</span>
       <button id="refresh" type="button">Refresh</button>
+      <button id="archive-project" class="danger" type="button">Archive</button>
     </div>
-    <section class="stack">
+    <section id="archive-view" class="panel hidden">
+      <h2>Archive</h2>
+      <div id="archive-list" class="empty"></div>
+    </section>
+    <section id="workspace-view" class="stack">
       <div class="panel">
         <h2>History</h2>
         <div id="messages" class="messages"></div>
@@ -297,7 +321,12 @@ const WEB_UI_HTML = `<!doctype html>
       to: document.querySelector("#to"),
       body: document.querySelector("#body"),
       sendStatus: document.querySelector("#send-status"),
+      archiveProject: document.querySelector("#archive-project"),
+      archiveView: document.querySelector("#archive-view"),
+      archiveList: document.querySelector("#archive-list"),
+      workspaceView: document.querySelector("#workspace-view"),
     };
+    const archiveMode = location.pathname === "/archive";
 
     function headers(extra = {}) {
       const base = { ...extra };
@@ -394,9 +423,9 @@ const WEB_UI_HTML = `<!doctype html>
       }
     }
 
-    async function loadProjects() {
+    async function loadProjects(archived = false) {
       const previous = projectIdentity(state.selectedProject);
-      const data = await api("/api/v1/projects");
+      const data = await api("/api/v1/projects" + (archived ? "?archived=1" : ""));
       state.projects = data.projects || [];
       state.selectedProject = state.projects.find((project) => projectIdentity(project) === previous) || state.projects[0] || null;
       renderProjects();
@@ -404,10 +433,11 @@ const WEB_UI_HTML = `<!doctype html>
 
     function renderProjects() {
       els.project.replaceChildren();
+      els.archiveProject.disabled = archiveMode || !state.selectedProject;
       if (state.projects.length === 0) {
         const option = document.createElement("option");
         option.value = "";
-        option.textContent = "No projects";
+        option.textContent = archiveMode ? "No archived projects" : "No projects";
         els.project.append(option);
         els.project.disabled = true;
         return;
@@ -420,6 +450,49 @@ const WEB_UI_HTML = `<!doctype html>
         option.selected = projectIdentity(project) === projectIdentity(state.selectedProject);
         els.project.append(option);
       }
+    }
+
+    async function setProjectArchived(project, archived) {
+      await api("/api/v1/projects/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team: project.team,
+          project_id: project.project_id,
+          archived,
+        }),
+      });
+    }
+
+    function renderArchive() {
+      if (state.projects.length === 0) {
+        els.archiveList.className = "empty";
+        els.archiveList.textContent = "No archived projects";
+        return;
+      }
+      const table = document.createElement("table");
+      table.innerHTML = "<thead><tr><th>Project</th><th>Team</th><th>Roles</th><th>Clients</th><th>Archived</th><th></th></tr></thead><tbody></tbody>";
+      for (const project of state.projects) {
+        const tr = document.createElement("tr");
+        for (const value of [projectLabel(project), project.team, project.roles, project.clients || "", project.archived_at || ""]) {
+          const td = document.createElement("td");
+          td.textContent = escapeText(value);
+          tr.append(td);
+        }
+        const action = document.createElement("td");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Restore";
+        button.addEventListener("click", async () => {
+          await setProjectArchived(project, false);
+          await refreshAll();
+        });
+        action.append(button);
+        tr.append(action);
+        table.querySelector("tbody").append(tr);
+      }
+      els.archiveList.className = "";
+      els.archiveList.replaceChildren(table);
     }
 
     async function loadMembers() {
@@ -552,8 +625,15 @@ const WEB_UI_HTML = `<!doctype html>
     async function refreshAll() {
       await loadHealth();
       try {
-        await loadProjects();
-        await refreshSelected();
+        els.archiveView.classList.toggle("hidden", !archiveMode);
+        els.workspaceView.classList.toggle("hidden", archiveMode);
+        els.archiveProject.classList.toggle("hidden", archiveMode);
+        await loadProjects(archiveMode);
+        if (archiveMode) {
+          renderArchive();
+        } else {
+          await refreshSelected();
+        }
       } catch (error) {
         setHealth(error.message, "error");
       }
@@ -561,6 +641,16 @@ const WEB_UI_HTML = `<!doctype html>
 
     els.refresh.addEventListener("click", refreshAll);
     els.token.addEventListener("change", refreshAll);
+    els.archiveProject.addEventListener("click", async () => {
+      if (!state.selectedProject) return;
+      if (!confirm("Archive this project registration group?")) return;
+      try {
+        await setProjectArchived(state.selectedProject, true);
+        await refreshAll();
+      } catch (error) {
+        setHealth(error.message, "error");
+      }
+    });
     els.project.addEventListener("change", async () => {
       state.selectedProject = state.projects.find((project) => projectIdentity(project) === els.project.value) || null;
       state.selectedAgent = "";
@@ -726,6 +816,7 @@ function createRegistrationsTable(db) {
       client_label TEXT NOT NULL DEFAULT '',
       hostname TEXT,
       project_key TEXT,
+      archived_at TEXT,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
       PRIMARY KEY (team, agent, agent_type, client_id, project_path),
       FOREIGN KEY (team) REFERENCES teams(name) ON DELETE CASCADE
@@ -737,6 +828,8 @@ function createRegistrationsTable(db) {
       ON registrations(team, agent);
     CREATE INDEX IF NOT EXISTS idx_registrations_project_key
       ON registrations(project_key);
+    CREATE INDEX IF NOT EXISTS idx_registrations_archived
+      ON registrations(archived_at);
   `);
 }
 
@@ -758,6 +851,9 @@ function ensureRegistrationsTable(db) {
     if (!columns.includes('project_key')) {
       db.exec('ALTER TABLE registrations ADD COLUMN project_key TEXT');
     }
+    if (!columns.includes('archived_at')) {
+      db.exec('ALTER TABLE registrations ADD COLUMN archived_at TEXT');
+    }
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_registrations_project
         ON registrations(client_id, project_path, agent_type);
@@ -765,6 +861,8 @@ function ensureRegistrationsTable(db) {
         ON registrations(team, agent);
       CREATE INDEX IF NOT EXISTS idx_registrations_project_key
         ON registrations(project_key);
+      CREATE INDEX IF NOT EXISTS idx_registrations_archived
+        ON registrations(archived_at);
     `);
     return;
   }
@@ -774,8 +872,8 @@ function ensureRegistrationsTable(db) {
   createRegistrationsTable(db);
   const insert = db.prepare(`
     INSERT OR IGNORE INTO registrations
-      (team, agent, agent_type, project_path, client_id, client_label, hostname, project_key, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (team, agent, agent_type, project_path, client_id, client_label, hostname, project_key, archived_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const row of legacyRows) {
     insert.run(
@@ -785,6 +883,7 @@ function ensureRegistrationsTable(db) {
       row.project_path,
       'legacy',
       'legacy',
+      null,
       null,
       null,
       row.created_at || new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -868,7 +967,7 @@ function createHandler({ db, token, verbose }) {
       console.error(`${req.method} ${url.pathname}`);
     }
 
-    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/archive')) {
       htmlResponse(res, 200, WEB_UI_HTML);
       return;
     }
@@ -916,7 +1015,11 @@ function createHandler({ db, token, verbose }) {
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/v1/projects') {
-      handleProjects(res, db);
+      handleProjects(url, res, db);
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/v1/projects/archive') {
+      await handleProjectArchive(req, res, db);
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/v1/teams/members') {
@@ -1130,7 +1233,8 @@ async function handleJoin(req, res, db) {
     ON CONFLICT(team, agent, agent_type, client_id, project_path) DO UPDATE SET
       client_label = excluded.client_label,
       hostname = excluded.hostname,
-      project_key = excluded.project_key
+      project_key = excluded.project_key,
+      archived_at = NULL
   `).run(team, agent, agentType, project, clientId, clientLabel, hostname, projectKey);
 
   jsonResponse(res, 200, {
@@ -1147,7 +1251,7 @@ function handleTeams(res, db) {
       teams.created_at AS created_at,
       COUNT(DISTINCT registrations.agent) AS members
     FROM teams
-    LEFT JOIN registrations ON registrations.team = teams.name
+    LEFT JOIN registrations ON registrations.team = teams.name AND registrations.archived_at IS NULL
     GROUP BY teams.name
     ORDER BY teams.name ASC
   `).all();
@@ -1155,29 +1259,73 @@ function handleTeams(res, db) {
   jsonResponse(res, 200, { teams: rows });
 }
 
-function handleProjects(res, db) {
+function projectIdSql(alias = '') {
+  const prefix = alias ? `${alias}.` : '';
+  return `COALESCE(NULLIF(${prefix}project_key, ''), ${prefix}project_path)`;
+}
+
+function archivedParam(url) {
+  const value = (url.searchParams.get('archived') || '').toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes';
+}
+
+function handleProjects(url, res, db) {
+  const archived = archivedParam(url);
+  const archiveWhere = archived ? 'r.archived_at IS NOT NULL' : 'r.archived_at IS NULL';
+  const projectId = projectIdSql('r');
+  const projectIdR2 = projectIdSql('r2');
   const rows = db.prepare(`
     SELECT
-      team,
-      COALESCE(NULLIF(project_key, ''), project_path) AS project_id,
-      COALESCE(project_key, '') AS project_key,
+      r.team AS team,
+      ${projectId} AS project_id,
+      COALESCE(r.project_key, '') AS project_key,
       COALESCE((
         SELECT r2.project_path
         FROM registrations r2
-        WHERE r2.team = registrations.team
-          AND COALESCE(NULLIF(r2.project_key, ''), r2.project_path) = COALESCE(NULLIF(registrations.project_key, ''), registrations.project_path)
+        WHERE r2.team = r.team
+          AND ${projectIdR2} = ${projectId}
+          AND r2.archived_at ${archived ? 'IS NOT NULL' : 'IS NULL'}
         ORDER BY r2.rowid DESC
         LIMIT 1
       ), '') AS project_path,
-      COUNT(DISTINCT agent) AS roles,
+      COUNT(DISTINCT r.agent) AS roles,
       COUNT(*) AS registrations,
-      GROUP_CONCAT(DISTINCT client_label) AS clients
-    FROM registrations
-    GROUP BY team, COALESCE(NULLIF(project_key, ''), project_path)
+      GROUP_CONCAT(DISTINCT r.client_label) AS clients,
+      MAX(r.archived_at) AS archived_at
+    FROM registrations r
+    WHERE ${archiveWhere}
+    GROUP BY r.team, ${projectId}
     ORDER BY team ASC, project_path ASC
   `).all();
 
   jsonResponse(res, 200, { projects: rows });
+}
+
+async function handleProjectArchive(req, res, db) {
+  const payload = await readJson(req);
+  if (payload === null) {
+    errorResponse(res, 400, 'invalid_json', 'request body is not valid JSON');
+    return;
+  }
+
+  const team = payload.team || '';
+  const projectId = payload.project_id || '';
+  const archived = Boolean(payload.archived);
+  if (!team || !projectId) {
+    errorResponse(res, 400, 'missing_field', 'team and project_id are required');
+    return;
+  }
+
+  const sqlProjectId = projectIdSql();
+  const result = db.prepare(`
+    UPDATE registrations
+    SET archived_at = ${archived ? "strftime('%Y-%m-%dT%H:%M:%SZ', 'now')" : 'NULL'}
+    WHERE team = ?
+      AND ${sqlProjectId} = ?
+      AND archived_at ${archived ? 'IS NULL' : 'IS NOT NULL'}
+  `).run(team, projectId);
+
+  jsonResponse(res, 200, { archived, updated: result.changes });
 }
 
 function handleTeamMembers(url, res, db) {
@@ -1200,20 +1348,20 @@ function handleTeamMembers(url, res, db) {
       COALESCE((
         SELECT r2.project_path
         FROM registrations r2
-        WHERE r2.team = r.team AND r2.agent = r.agent
+        WHERE r2.team = r.team AND r2.agent = r.agent AND r2.archived_at IS NULL
         ORDER BY r2.rowid DESC
         LIMIT 1
       ), '?') AS project,
       COALESCE((
         SELECT r2.client_label
         FROM registrations r2
-        WHERE r2.team = r.team AND r2.agent = r.agent
+        WHERE r2.team = r.team AND r2.agent = r.agent AND r2.archived_at IS NULL
         ORDER BY r2.rowid DESC
         LIMIT 1
       ), '?') AS client_label,
       COUNT(*) AS registrations
     FROM registrations r
-    WHERE r.team = ?
+    WHERE r.team = ? AND r.archived_at IS NULL
     GROUP BY r.agent
     ORDER BY r.agent ASC
   `).all(team);
@@ -1221,7 +1369,7 @@ function handleTeamMembers(url, res, db) {
   const registrationRows = db.prepare(`
     SELECT agent, agent_type, project_path, client_id, client_label, hostname, project_key, created_at
     FROM registrations
-    WHERE team = ?
+    WHERE team = ? AND archived_at IS NULL
     ORDER BY agent ASC, client_label ASC, project_path ASC
   `).all(team);
   const registrationsByAgent = new Map();
@@ -1310,7 +1458,7 @@ function requireRegisteredAgent(res, db, team, agent) {
   const row = db.prepare(`
     SELECT 1
     FROM registrations
-    WHERE team = ? AND agent = ?
+    WHERE team = ? AND agent = ? AND archived_at IS NULL
     LIMIT 1
   `).get(team, agent);
   if (row) {
@@ -1388,17 +1536,23 @@ function handleIdentities(url, res, db) {
   const exact = db.prepare(`
     SELECT team, agent
     FROM registrations
-    WHERE project_path = ? AND agent_type = ? AND client_id = ?
+    WHERE project_path = ? AND agent_type = ? AND client_id = ? AND archived_at IS NULL
+    ORDER BY team ASC, agent ASC
+  `).all(project, agentType, clientId);
+  const archivedExact = db.prepare(`
+    SELECT team, agent, archived_at
+    FROM registrations
+    WHERE project_path = ? AND agent_type = ? AND client_id = ? AND archived_at IS NOT NULL
     ORDER BY team ASC, agent ASC
   `).all(project, agentType, clientId);
   const suggested = db.prepare(`
     SELECT DISTINCT team, agent
     FROM registrations
-    WHERE agent_type = ? AND client_id = ? AND NOT (project_path = ?)
+    WHERE agent_type = ? AND client_id = ? AND NOT (project_path = ?) AND archived_at IS NULL
     ORDER BY team ASC, agent ASC
   `).all(agentType, clientId, project);
 
-  jsonResponse(res, 200, { exact, suggested, teams });
+  jsonResponse(res, 200, { exact, archived_exact: archivedExact, suggested, teams });
 }
 
 const args = parseArgs(process.argv.slice(2));

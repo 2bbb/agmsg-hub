@@ -61,7 +61,8 @@ A role is addressed by `(team, agent)`. A client registration is identified by
           "client_id": "client-uuid",
           "client_label": "mac-mini",
           "hostname": "mac-mini",
-          "project_key": "git:https://github.com/2bbb/example.git"
+          "project_key": "git:https://github.com/2bbb/example.git",
+          "archived_at": null
         }
       ]
     }
@@ -71,6 +72,12 @@ A role is addressed by `(team, agent)`. A client registration is identified by
 ```
 
 Manipulated via sqlite3 JSON1 functions (no python3 dependency).
+
+Remote/server registrations also carry `archived_at`. Archived registrations are
+hidden from active project, member, identity, and role-instruction resolution,
+but remain visible through the browser UI's `/archive` page and can be restored.
+An archived exact identity is reported as `archived=true` by `whoami.sh` instead
+of being treated as a normal `not_joined` case.
 
 ### User Config — YAML
 
