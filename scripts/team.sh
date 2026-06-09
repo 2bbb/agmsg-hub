@@ -7,6 +7,27 @@ set -euo pipefail
 TEAM="${1:?Usage: team.sh <team>}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/storage.sh"
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  echo "Team: $TEAM"
+  echo ""
+  COUNT=0
+  while IFS='	' read -r name types project registrations; do
+    [ -n "$name" ] || continue
+    if [ "${registrations:-0}" -gt 1 ]; then
+      echo "  $name ($types) — $project (+$((registrations - 1)) more)"
+    else
+      echo "  $name ($types) — $project"
+    fi
+    COUNT=$((COUNT + 1))
+  done < <(agmsg_remote_team_rows "$TEAM")
+  echo ""
+  echo "$COUNT member(s)"
+  exit 0
+fi
+
 CONFIG="$SCRIPT_DIR/../teams/$TEAM/config.json"
 
 if [ ! -f "$CONFIG" ]; then

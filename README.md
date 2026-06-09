@@ -259,7 +259,8 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 ## Remote Server MVP
 
 Local SQLite remains the default. Remote mode is opt-in and currently covers
-the core message flow: `send.sh`, `inbox.sh`, and `history.sh` over HTTP.
+the core message flow plus server-side team registry: `join.sh`, `team.sh`,
+`whoami.sh`, `send.sh`, `inbox.sh`, and `history.sh` over HTTP.
 
 Start a server on the machine that should own the shared SQLite store:
 

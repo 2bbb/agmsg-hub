@@ -75,6 +75,26 @@ function initDb(path) {
       WHERE read_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_history
       ON messages(team, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS teams (
+      name TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS registrations (
+      team TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      agent_type TEXT NOT NULL,
+      project_path TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (team, agent, agent_type, project_path),
+      FOREIGN KEY (team) REFERENCES teams(name) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_registrations_project
+      ON registrations(project_path, agent_type);
+    CREATE INDEX IF NOT EXISTS idx_registrations_team_agent
+      ON registrations(team, agent);
   `);
   return db;
 }
@@ -174,6 +194,22 @@ function createHandler({ db, token, verbose }) {
     }
     if (req.method === 'GET' && url.pathname === '/api/v1/messages/history') {
       handleHistory(url, res, db);
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/v1/teams/join') {
+      await handleJoin(req, res, db);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/v1/teams') {
+      handleTeams(res, db);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/v1/teams/members') {
+      handleTeamMembers(url, res, db);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/v1/identities') {
+      handleIdentities(url, res, db);
       return;
     }
 
@@ -294,6 +330,110 @@ function handleHistory(url, res, db) {
   }
 
   jsonResponse(res, 200, { messages: rows.reverse().map(messageRow) });
+}
+
+async function handleJoin(req, res, db) {
+  const payload = await readJson(req);
+  if (payload === null) {
+    errorResponse(res, 400, 'invalid_json', 'request body is not valid JSON');
+    return;
+  }
+
+  const team = payload.team || '';
+  const agent = payload.agent || '';
+  const agentType = payload.type || payload.agent_type || '';
+  const project = payload.project || payload.project_path || '';
+  if (!team || !agent || !agentType || !project) {
+    errorResponse(res, 400, 'missing_field', 'team, agent, type, and project are required');
+    return;
+  }
+
+  const existingTeam = db.prepare('SELECT name FROM teams WHERE name = ?').get(team);
+  db.prepare('INSERT OR IGNORE INTO teams (name) VALUES (?)').run(team);
+  db.prepare(`
+    INSERT OR IGNORE INTO registrations (team, agent, agent_type, project_path)
+    VALUES (?, ?, ?, ?)
+  `).run(team, agent, agentType, project);
+
+  jsonResponse(res, 200, {
+    team,
+    agent,
+    created_team: !existingTeam,
+  });
+}
+
+function handleTeams(res, db) {
+  const rows = db.prepare(`
+    SELECT
+      teams.name AS name,
+      teams.created_at AS created_at,
+      COUNT(DISTINCT registrations.agent) AS members
+    FROM teams
+    LEFT JOIN registrations ON registrations.team = teams.name
+    GROUP BY teams.name
+    ORDER BY teams.name ASC
+  `).all();
+
+  jsonResponse(res, 200, { teams: rows });
+}
+
+function handleTeamMembers(url, res, db) {
+  const team = url.searchParams.get('team') || '';
+  if (!team) {
+    errorResponse(res, 400, 'missing_field', 'team is required');
+    return;
+  }
+
+  const teamRow = db.prepare('SELECT name FROM teams WHERE name = ?').get(team);
+  if (!teamRow) {
+    errorResponse(res, 404, 'not_found', 'team not found');
+    return;
+  }
+
+  const rows = db.prepare(`
+    SELECT
+      r.agent AS name,
+      GROUP_CONCAT(DISTINCT r.agent_type) AS types,
+      COALESCE((
+        SELECT r2.project_path
+        FROM registrations r2
+        WHERE r2.team = r.team AND r2.agent = r.agent
+        ORDER BY r2.rowid DESC
+        LIMIT 1
+      ), '?') AS project,
+      COUNT(*) AS registrations
+    FROM registrations r
+    WHERE r.team = ?
+    GROUP BY r.agent
+    ORDER BY r.agent ASC
+  `).all(team);
+
+  jsonResponse(res, 200, { team, members: rows });
+}
+
+function handleIdentities(url, res, db) {
+  const project = url.searchParams.get('project') || '';
+  const agentType = url.searchParams.get('type') || '';
+  if (!project || !agentType) {
+    errorResponse(res, 400, 'missing_field', 'project and type are required');
+    return;
+  }
+
+  const teams = db.prepare('SELECT name FROM teams ORDER BY name ASC').all().map((row) => row.name);
+  const exact = db.prepare(`
+    SELECT team, agent
+    FROM registrations
+    WHERE project_path = ? AND agent_type = ?
+    ORDER BY team ASC, agent ASC
+  `).all(project, agentType);
+  const suggested = db.prepare(`
+    SELECT DISTINCT team, agent
+    FROM registrations
+    WHERE agent_type = ? AND NOT (project_path = ?)
+    ORDER BY team ASC, agent ASC
+  `).all(agentType, project);
+
+  jsonResponse(res, 200, { exact, suggested, teams });
 }
 
 const args = parseArgs(process.argv.slice(2));

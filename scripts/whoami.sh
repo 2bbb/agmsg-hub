@@ -79,6 +79,14 @@ PROJECT_PATH="${1:?Usage: whoami.sh <project_path> [type]}"
 AGENT_TYPE="${2:-$(detect_cli_type)}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/storage.sh"
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  agmsg_remote_identity_summary "$PROJECT_PATH" "$AGENT_TYPE"
+  exit 0
+fi
+
 TEAMS_DIR="$SCRIPT_DIR/../teams"
 
 if [ ! -d "$TEAMS_DIR" ]; then

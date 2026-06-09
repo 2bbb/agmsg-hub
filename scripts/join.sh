@@ -20,6 +20,22 @@ case "$AGENT_TYPE" in
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/storage.sh"
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  RESPONSE="$(agmsg_remote_join "$TEAM" "$AGENT_ID" "$AGENT_TYPE" "$PROJECT_PATH")"
+  TMP_RESPONSE="$(mktemp)"
+  printf '%s' "$RESPONSE" > "$TMP_RESPONSE"
+  CREATED_TEAM="$(sqlite3 :memory: "SELECT json_extract(readfile('$(printf '%s' "$TMP_RESPONSE" | sed "s/'/''/g")'), '$.created_team');" 2>/dev/null || echo 0)"
+  rm -f "$TMP_RESPONSE"
+  if [ "$CREATED_TEAM" = "1" ]; then
+    echo "Created team: $TEAM"
+  fi
+  echo "Joined team $TEAM as $AGENT_ID"
+  exit 0
+fi
+
 TEAMS_DIR="$SCRIPT_DIR/../teams"
 TEAM_CONFIG="$TEAMS_DIR/$TEAM/config.json"
 

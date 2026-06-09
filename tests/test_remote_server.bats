@@ -99,6 +99,39 @@ wait_for_http() {
   [[ "$output" =~ "Switched storage.active = sqlite" ]]
 }
 
+@test "remote storage: join, team, and whoami use server registry" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/remote-proj-a
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Created team: testteam" ]]
+  [[ "$output" =~ "Joined team testteam as alice" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam bob codex /tmp/remote-proj-b
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Joined team testteam as bob" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/team.sh" testteam
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "alice" ]]
+  [[ "$output" =~ "bob" ]]
+  [[ "$output" =~ "2 member" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/whoami.sh" /tmp/remote-proj-a codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=alice" ]]
+  [[ "$output" =~ "teams=testteam" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/whoami.sh" /tmp/remote-unknown codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "suggest=true" ]]
+  [[ "$output" =~ "agents=alice,bob" ]]
+  [[ "$output" =~ "available_teams=testteam" ]]
+}
+
 @test "remote storage: inbox --wait receives a later message" {
   (
     sleep 1

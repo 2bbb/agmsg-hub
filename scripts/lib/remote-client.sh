@@ -40,6 +40,16 @@ agmsg_json_read_payload() {
   fi
 }
 
+agmsg_json_join_payload() {
+  local team agent type project
+  team="$(agmsg_sql_escape "$1")"
+  agent="$(agmsg_sql_escape "$2")"
+  type="$(agmsg_sql_escape "$3")"
+  project="$(agmsg_sql_escape "$4")"
+
+  sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'type', '$type', 'project', '$project');"
+}
+
 agmsg_remote_headers() {
   local token
   token="$(agmsg_remote_token)"
@@ -97,6 +107,24 @@ agmsg_remote_get_messages() {
     --data-urlencode "team=$team" \
     --data-urlencode "agent=$agent" \
     --data-urlencode "limit=$limit" \
+    "$base$path"
+}
+
+agmsg_remote_get() {
+  local path="$1"
+  shift
+  local base
+  base="$(agmsg_remote_base_url)"
+
+  local headers=()
+  while IFS= read -r header_arg; do
+    headers+=("$header_arg")
+  done < <(agmsg_remote_headers)
+
+  curl -fsS -G \
+    -H "Accept: application/json" \
+    ${headers[@]+"${headers[@]}"} \
+    "$@" \
     "$base$path"
 }
 
@@ -168,4 +196,94 @@ agmsg_remote_mark_read() {
   local payload
   payload="$(agmsg_json_read_payload "$team" "$agent" "$@")"
   agmsg_remote_post "/api/v1/messages/read" "$payload" >/dev/null
+}
+
+agmsg_remote_join() {
+  local team="$1"
+  local agent="$2"
+  local type="$3"
+  local project="$4"
+  local payload
+  payload="$(agmsg_json_join_payload "$team" "$agent" "$type" "$project")"
+  agmsg_remote_post "/api/v1/teams/join" "$payload"
+}
+
+agmsg_remote_team_rows() {
+  local team="$1"
+  local response tmp
+  response="$(agmsg_remote_get "/api/v1/teams/members" --data-urlencode "team=$team")"
+  tmp="$(mktemp)"
+  printf '%s' "$response" > "$tmp"
+  sqlite3 -separator $'\t' :memory: "
+    SELECT
+      json_extract(value, '$.name'),
+      COALESCE(json_extract(value, '$.types'), ''),
+      COALESCE(json_extract(value, '$.project'), '?'),
+      COALESCE(json_extract(value, '$.registrations'), 0)
+    FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.members');
+  "
+  rm -f "$tmp"
+}
+
+agmsg_remote_identity_summary() {
+  local project="$1"
+  local type="$2"
+  local response tmp
+  response="$(agmsg_remote_get "/api/v1/identities" --data-urlencode "project=$project" --data-urlencode "type=$type")"
+  tmp="$(mktemp)"
+  printf '%s' "$response" > "$tmp"
+
+  local exact_count agent_names team_names suggested_agents suggested_teams all_teams
+  exact_count="$(sqlite3 :memory: "SELECT COUNT(*) FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.exact');")"
+  all_teams="$(sqlite3 -separator ',' :memory: "SELECT GROUP_CONCAT(value) FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.teams');")"
+
+  if [ "$exact_count" = "0" ]; then
+    suggested_agents="$(sqlite3 -separator ',' :memory: "
+      SELECT GROUP_CONCAT(agent)
+      FROM (
+        SELECT DISTINCT json_extract(value, '$.agent') AS agent
+        FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.suggested')
+        ORDER BY agent
+      );
+    ")"
+    suggested_teams="$(sqlite3 -separator ',' :memory: "
+      SELECT GROUP_CONCAT(team)
+      FROM (
+        SELECT DISTINCT json_extract(value, '$.team') AS team
+        FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.suggested')
+        ORDER BY team
+      );
+    ")"
+    rm -f "$tmp"
+    if [ -n "$suggested_agents" ]; then
+      echo "suggest=true agents=$suggested_agents teams=$suggested_teams type=$type project=$project available_teams=${all_teams:-none}"
+    else
+      echo "not_joined=true available_teams=${all_teams:-none}"
+    fi
+    return
+  fi
+
+  agent_names="$(sqlite3 -separator ',' :memory: "
+    SELECT GROUP_CONCAT(agent)
+    FROM (
+      SELECT DISTINCT json_extract(value, '$.agent') AS agent
+      FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.exact')
+      ORDER BY agent
+    );
+  ")"
+  team_names="$(sqlite3 -separator ',' :memory: "
+    SELECT GROUP_CONCAT(team)
+    FROM (
+      SELECT DISTINCT json_extract(value, '$.team') AS team
+      FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.exact')
+      ORDER BY team
+    );
+  ")"
+  rm -f "$tmp"
+
+  if [ "$(printf '%s' "$agent_names" | awk -F, '{print NF}')" -eq 1 ]; then
+    echo "agent=$agent_names teams=$team_names type=$type project=$project"
+  else
+    echo "multiple=true agents=$agent_names teams=$team_names type=$type project=$project"
+  fi
 }

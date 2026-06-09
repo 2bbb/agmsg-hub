@@ -7,7 +7,7 @@
 - `install.sh` は **agmsg-hub repo 内**で実行する。
 - `$agmsg` は **Codex で作業する repo 内**で使う。
 - remote server は `agmsgd`。Codex CLI や Codex.app は server ではなく client/agent。
-- 現在の remote MVP で server 側に集まるのは message DB。`join.sh` の team/agent 登録は各 client のローカル `~/.agents/skills/agmsg/teams/` に残る。
+- remote mode では message DB と team/agent registry が server 側に集まる。local mode では従来通り各 client の `~/.agents/skills/agmsg/teams/` を使う。
 
 ## 更新
 
@@ -86,7 +86,7 @@ local SQLite に戻す:
 
 ## Join
 
-各 client で同じ team 名、別 agent 名を使って join する。
+各 client で同じ team 名、別 agent 名を使って join する。remote mode ではこの登録は server 側の registry に保存され、`team.sh` と `whoami.sh` も server を見る。
 
 例: server 側 Codex CLI:
 
@@ -102,7 +102,7 @@ cd /Users/2bit/prog/nozzle_proj
 ~/.agents/skills/agmsg/scripts/join.sh codex-test app codex "$(pwd)"
 ```
 
-現状では remote server が team registry を共有しないので、client ごとに join が必要。
+同じ project/type/agent で再 join しても重複登録にはならない。別 client や別 project から使う場合は、その client/project でも join する。
 
 ## 送受信テスト
 
@@ -198,7 +198,7 @@ agent 名そのものを変更する場合:
 ~/.agents/skills/agmsg/scripts/rename.sh codex-test old_name new_name
 ```
 
-ただし remote MVP では team/agent 登録は client ローカルなので、必要な client 側で実行する。
+remote mode では `join.sh`, `team.sh`, `whoami.sh` は server registry を使う。ただし `rename.sh` はまだ remote registry API に対応していないので、名前変更は未整備。
 
 ## よくある失敗
 
