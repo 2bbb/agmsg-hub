@@ -17,9 +17,10 @@ agmsg_json_message_payload() {
 }
 
 agmsg_json_read_payload() {
-  local team agent ids_csv
+  local team agent client_id ids_csv
   team="$(agmsg_sql_escape "$1")"
   agent="$(agmsg_sql_escape "$2")"
+  client_id="$(agmsg_sql_escape "$(agmsg_client_id)")"
   shift 2
 
   ids_csv=""
@@ -36,9 +37,9 @@ agmsg_json_read_payload() {
   done
 
   if [ -n "$ids_csv" ]; then
-    sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'ids', json_array($ids_csv));"
+    sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'client_id', '$client_id', 'ids', json_array($ids_csv));"
   else
-    sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent');"
+    sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'client_id', '$client_id');"
   fi
 }
 
@@ -132,6 +133,7 @@ agmsg_remote_get_messages() {
   local team="$2"
   local agent="$3"
   local limit="$4"
+  local client_id="${5:-}"
   local base
   base="$(agmsg_remote_base_url)"
 
@@ -140,12 +142,19 @@ agmsg_remote_get_messages() {
     headers+=("$header_arg")
   done < <(agmsg_remote_headers)
 
+  local params=(
+    --data-urlencode "team=$team"
+    --data-urlencode "agent=$agent"
+    --data-urlencode "limit=$limit"
+  )
+  if [ -n "$client_id" ]; then
+    params+=(--data-urlencode "client_id=$client_id")
+  fi
+
   curl -fsS -G \
     -H "Accept: application/json" \
     ${headers[@]+"${headers[@]}"} \
-    --data-urlencode "team=$team" \
-    --data-urlencode "agent=$agent" \
-    --data-urlencode "limit=$limit" \
+    "${params[@]}" \
     "$base$path"
 }
 
@@ -194,7 +203,7 @@ agmsg_remote_unread_rows() {
   local agent="$2"
   local limit="${3:-100}"
   local response tmp
-  response="$(agmsg_remote_get_messages "/api/v1/messages/unread" "$team" "$agent" "$limit")"
+  response="$(agmsg_remote_get_messages "/api/v1/messages/unread" "$team" "$agent" "$limit" "$(agmsg_client_id)")"
   tmp="$(mktemp)"
   printf '%s' "$response" > "$tmp"
   sqlite3 -separator $'\t' :memory: "
@@ -213,7 +222,7 @@ agmsg_remote_history_rows() {
   local agent="$2"
   local limit="${3:-20}"
   local response tmp
-  response="$(agmsg_remote_get_messages "/api/v1/messages/history" "$team" "$agent" "$limit")"
+  response="$(agmsg_remote_get_messages "/api/v1/messages/history" "$team" "$agent" "$limit" "$(agmsg_client_id)")"
   tmp="$(mktemp)"
   printf '%s' "$response" > "$tmp"
   sqlite3 -separator $'\t' :memory: "
@@ -364,4 +373,22 @@ agmsg_remote_identity_summary() {
   else
     echo "multiple=true agents=$agent_names teams=$team_names type=$type project=$project client=$client_id"
   fi
+}
+
+agmsg_remote_identity_pairs() {
+  local project="$1"
+  local type="$2"
+  local response tmp
+  response="$(agmsg_remote_get "/api/v1/identities" \
+    --data-urlencode "project=$project" \
+    --data-urlencode "type=$type" \
+    --data-urlencode "client_id=$(agmsg_client_id)")"
+  tmp="$(mktemp)"
+  printf '%s' "$response" > "$tmp"
+  sqlite3 -separator $'\t' :memory: "
+    SELECT json_extract(value, '$.team'), json_extract(value, '$.agent')
+    FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.exact')
+    ORDER BY 1, 2;
+  "
+  rm -f "$tmp"
 }

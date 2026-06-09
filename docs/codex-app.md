@@ -122,7 +122,7 @@ Use this checklist before treating Codex app local support as working.
    Acceptance:
 
    - `$agmsg` reads the message.
-   - The message is marked read after inbox display.
+   - The message is marked read for this client's `client_id` after inbox display.
 
 ### Cloud Mode
 

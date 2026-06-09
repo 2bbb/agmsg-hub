@@ -88,6 +88,30 @@ wait_for_http() {
   [[ "$output" =~ "○" ]]
 }
 
+@test "remote storage: read receipts are scoped to client id" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/send.sh" testteam alice bob "remote per-client"
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-a \
+    bash "$SCRIPTS/inbox.sh" testteam bob
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "remote per-client" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-a \
+    bash "$SCRIPTS/inbox.sh" testteam bob
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "No new messages" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-b \
+    bash "$SCRIPTS/inbox.sh" testteam bob
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "remote per-client" ]]
+}
+
 @test "remote storage: configure and switch make remote the default" {
   run bash "$SCRIPTS/remote.sh" configure "$SERVER_URL"
   [ "$status" -eq 0 ]
@@ -236,4 +260,23 @@ wait_for_http() {
 
   [ "$status" -eq 0 ]
   [[ "$output" =~ "remote delayed" ]]
+}
+
+@test "remote storage: check-inbox uses remote unread messages" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=hook-client \
+    bash "$SCRIPTS/join.sh" testteam reviewer codex /tmp/hook-proj
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/send.sh" testteam alice reviewer "hook remote message"
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=hook-client \
+    bash "$SCRIPTS/check-inbox.sh" codex /tmp/hook-proj
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ '"decision": "block"' ]]
+  [[ "$output" =~ "testteam/reviewer" ]]
+  [[ "$output" =~ "hook remote message" ]]
 }

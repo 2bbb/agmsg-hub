@@ -50,6 +50,22 @@ teardown() {
   [[ "$output" =~ "No new messages" ]]
 }
 
+@test "inbox: read receipts are scoped to client id" {
+  bash "$SCRIPTS/send.sh" testteam alice bob "per-client read"
+
+  run env AGMSG_CLIENT_ID=client-a bash "$SCRIPTS/inbox.sh" testteam bob
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "per-client read" ]]
+
+  run env AGMSG_CLIENT_ID=client-a bash "$SCRIPTS/inbox.sh" testteam bob
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "No new messages" ]]
+
+  run env AGMSG_CLIENT_ID=client-b bash "$SCRIPTS/inbox.sh" testteam bob
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "per-client read" ]]
+}
+
 @test "inbox: --quiet suppresses output when no messages" {
   run bash "$SCRIPTS/inbox.sh" testteam alice --quiet
   [ "$status" -eq 0 ]

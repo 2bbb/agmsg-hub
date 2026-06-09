@@ -23,6 +23,18 @@ CREATE TABLE messages (
 
 CREATE INDEX idx_unread ON messages(team, to_agent, read_at) WHERE read_at IS NULL;
 CREATE INDEX idx_history ON messages(team, created_at DESC);
+
+CREATE TABLE message_reads (
+  message_id INTEGER NOT NULL,
+  team TEXT NOT NULL,
+  agent TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  read_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  PRIMARY KEY (message_id, client_id)
+);
+
+CREATE INDEX idx_message_reads_inbox
+  ON message_reads(team, agent, client_id, message_id);
 SQL
   echo "DB initialized: $DB"
 fi

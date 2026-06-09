@@ -55,6 +55,8 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+source "$SCRIPT_DIR/lib/client.sh"
+CLIENT_ID="$(agmsg_client_id)"
 
 REMOTE=false
 if agmsg_using_remote_storage; then
@@ -63,6 +65,22 @@ if agmsg_using_remote_storage; then
 else
   DB="$(agmsg_db_path)"
 fi
+
+ensure_read_receipts_table() {
+  [ -f "$DB" ] || return 0
+  sqlite3 "$DB" "
+    CREATE TABLE IF NOT EXISTS message_reads (
+      message_id INTEGER NOT NULL,
+      team TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      read_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (message_id, client_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_message_reads_inbox
+      ON message_reads(team, agent, client_id, message_id);
+  "
+}
 
 fetch_unread() {
   if [ "$REMOTE" = true ]; then
@@ -73,16 +91,22 @@ fetch_unread() {
   if [ ! -f "$DB" ]; then
     return 0
   fi
+  ensure_read_receipts_table
 
   sqlite3 -separator $'\t' "$DB" "
     SELECT
-      id,
-      from_agent,
-      replace(replace(body, char(10), '\n'), char(9), '\t'),
-      created_at
-    FROM messages
-    WHERE team='$TEAM' AND to_agent='$AGENT' AND read_at IS NULL
-    ORDER BY created_at ASC, id ASC;
+      m.id,
+      m.from_agent,
+      replace(replace(m.body, char(10), '\n'), char(9), '\t'),
+      m.created_at
+    FROM messages m
+    LEFT JOIN message_reads mr
+      ON mr.message_id = m.id
+     AND mr.client_id = '$(printf '%s' "$CLIENT_ID" | sed "s/'/''/g")'
+    WHERE m.team='$TEAM'
+      AND m.to_agent='$AGENT'
+      AND mr.message_id IS NULL
+    ORDER BY m.created_at ASC, m.id ASC;
   "
 }
 
@@ -99,6 +123,7 @@ mark_read() {
   if [ ! -f "$DB" ]; then
     return 0
   fi
+  ensure_read_receipts_table
 
   local ids_csv="" id
   for id in "$@"; do
@@ -115,7 +140,17 @@ mark_read() {
     return 0
   fi
 
-  sqlite3 "$DB" "UPDATE messages SET read_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE team='$TEAM' AND to_agent='$AGENT' AND read_at IS NULL AND id IN ($ids_csv);" 2>/dev/null || true
+  local client_escaped
+  client_escaped="$(printf '%s' "$CLIENT_ID" | sed "s/'/''/g")"
+  sqlite3 "$DB" "
+    INSERT OR IGNORE INTO message_reads (message_id, team, agent, client_id)
+    SELECT id, team, to_agent, '$client_escaped'
+    FROM messages
+    WHERE team='$TEAM' AND to_agent='$AGENT' AND id IN ($ids_csv);
+    UPDATE messages
+    SET read_at=COALESCE(read_at, strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    WHERE team='$TEAM' AND to_agent='$AGENT' AND id IN ($ids_csv);
+  " 2>/dev/null || true
 }
 
 display_and_mark() {

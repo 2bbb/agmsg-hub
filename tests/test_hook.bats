@@ -154,3 +154,16 @@ print(len(d['hooks']['Stop']))
   [ "$status" -eq 0 ]
   [[ "$output" =~ "I am the owner" ]]
 }
+
+@test "check-inbox: checks every exact identity for the project and type" {
+  bash "$SCRIPTS/join.sh" testteam alice claude-code "$TEST_PROJECT"
+  bash "$SCRIPTS/join.sh" testteam reviewer claude-code "$TEST_PROJECT"
+  bash "$SCRIPTS/send.sh" testteam bob alice "for alice"
+  bash "$SCRIPTS/send.sh" testteam bob reviewer "for reviewer"
+  bash "$SCRIPTS/config.sh" set delivery.turn.check_interval 0 >/dev/null
+
+  run bash -c "echo '{}' | bash '$SCRIPTS/check-inbox.sh' claude-code '$TEST_PROJECT'"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "for alice" ]]
+  [[ "$output" =~ "for reviewer" ]]
+}

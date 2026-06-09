@@ -684,6 +684,19 @@ function initDb(path) {
     CREATE INDEX IF NOT EXISTS idx_history
       ON messages(team, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS message_reads (
+      message_id INTEGER NOT NULL,
+      team TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      read_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (message_id, client_id),
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_message_reads_inbox
+      ON message_reads(team, agent, client_id, message_id);
+
     CREATE TABLE IF NOT EXISTS teams (
       name TEXT PRIMARY KEY,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
@@ -953,19 +966,23 @@ async function handleSend(req, res, db) {
 function handleUnread(url, res, db) {
   const team = url.searchParams.get('team') || '';
   const agent = url.searchParams.get('agent') || '';
+  const clientId = url.searchParams.get('client_id') || '';
   const limit = intParam(url.searchParams.get('limit'), 100);
-  if (!team || !agent) {
-    errorResponse(res, 400, 'missing_field', 'team and agent are required');
+  if (!team || !agent || !clientId) {
+    errorResponse(res, 400, 'missing_field', 'team, agent, and client_id are required');
     return;
   }
 
   const rows = db.prepare(`
-    SELECT id, team, from_agent, to_agent, body, created_at, read_at
-    FROM messages
-    WHERE team = ? AND to_agent = ? AND read_at IS NULL
-    ORDER BY created_at ASC, id ASC
+    SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, mr.read_at
+    FROM messages m
+    LEFT JOIN message_reads mr
+      ON mr.message_id = m.id
+     AND mr.client_id = ?
+    WHERE m.team = ? AND m.to_agent = ? AND mr.message_id IS NULL
+    ORDER BY m.created_at ASC, m.id ASC
     LIMIT ?
-  `).all(team, agent, limit);
+  `).all(clientId, team, agent, limit);
 
   jsonResponse(res, 200, { messages: rows.map(messageRow) });
 }
@@ -979,8 +996,9 @@ async function handleRead(req, res, db) {
 
   const team = payload.team || '';
   const agent = payload.agent || '';
-  if (!team || !agent) {
-    errorResponse(res, 400, 'missing_field', 'team and agent are required');
+  const clientId = payload.client_id || '';
+  if (!team || !agent || !clientId) {
+    errorResponse(res, 400, 'missing_field', 'team, agent, and client_id are required');
     return;
   }
 
@@ -995,15 +1013,33 @@ async function handleRead(req, res, db) {
     }
     const placeholders = ids.map(() => '?').join(', ');
     result = db.prepare(`
-      UPDATE messages
-      SET read_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-      WHERE team = ? AND to_agent = ? AND read_at IS NULL
+      INSERT OR IGNORE INTO message_reads (message_id, team, agent, client_id)
+      SELECT id, team, to_agent, ?
+      FROM messages
+      WHERE team = ? AND to_agent = ?
         AND id IN (${placeholders})
+    `).run(clientId, team, agent, ...ids);
+    db.prepare(`
+      UPDATE messages
+      SET read_at = COALESCE(read_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      WHERE team = ? AND to_agent = ? AND id IN (${placeholders})
     `).run(team, agent, ...ids);
   } else {
     result = db.prepare(`
+      INSERT OR IGNORE INTO message_reads (message_id, team, agent, client_id)
+      SELECT id, team, to_agent, ?
+      FROM messages
+      WHERE team = ? AND to_agent = ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM message_reads mr
+          WHERE mr.message_id = messages.id
+            AND mr.client_id = ?
+        )
+    `).run(clientId, team, agent, clientId);
+    db.prepare(`
       UPDATE messages
-      SET read_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      SET read_at = COALESCE(read_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
       WHERE team = ? AND to_agent = ? AND read_at IS NULL
     `).run(team, agent);
   }
@@ -1014,6 +1050,7 @@ async function handleRead(req, res, db) {
 function handleHistory(url, res, db) {
   const team = url.searchParams.get('team') || '';
   const agent = url.searchParams.get('agent') || '';
+  const clientId = url.searchParams.get('client_id') || '';
   const limit = intParam(url.searchParams.get('limit'), 20);
   if (!team) {
     errorResponse(res, 400, 'missing_field', 'team is required');
@@ -1021,7 +1058,29 @@ function handleHistory(url, res, db) {
   }
 
   let rows;
-  if (agent) {
+  if (agent && clientId) {
+    rows = db.prepare(`
+      SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, mr.read_at
+      FROM messages m
+      LEFT JOIN message_reads mr
+        ON mr.message_id = m.id
+       AND mr.client_id = ?
+      WHERE m.team = ? AND (m.from_agent = ? OR m.to_agent = ?)
+      ORDER BY m.created_at DESC, m.id DESC
+      LIMIT ?
+    `).all(clientId, team, agent, agent, limit);
+  } else if (clientId) {
+    rows = db.prepare(`
+      SELECT m.id, m.team, m.from_agent, m.to_agent, m.body, m.created_at, mr.read_at
+      FROM messages m
+      LEFT JOIN message_reads mr
+        ON mr.message_id = m.id
+       AND mr.client_id = ?
+      WHERE m.team = ?
+      ORDER BY m.created_at DESC, m.id DESC
+      LIMIT ?
+    `).all(clientId, team, limit);
+  } else if (agent) {
     rows = db.prepare(`
       SELECT id, team, from_agent, to_agent, body, created_at, read_at
       FROM messages

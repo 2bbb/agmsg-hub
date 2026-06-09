@@ -160,14 +160,16 @@ Mechanics:
 - Switching is session-scoped state held by the agent. `/clear` or a new session resets back to the multiple-identities picker.
 - **Recovery**: `actas-claim.sh` writes the lock file before the skill TaskStops the old Monitor and launches the new one. If that subsequent dance fails (e.g. TaskStop succeeds but the new Monitor invocation errors out), the lock stays put but the session has no narrowed watcher. Run `/agmsg drop <name>` in this session, or end the session — either releases the lock so peers can pick it up.
 - **Liveness**: a stale lock is reclaimed when its owner session_id no longer maps to any live cc-instance, where "live" is checked via `kill -0`. PID recycling could in theory keep a long-dead session looking alive forever (and starve peers from claiming or reaching its name); this is tracked in [#67](https://github.com/2bbb/agmsg-hub/issues/67) and not addressed in v1.
-- **Codex caveat**: on Codex, `$agmsg actas <name>` is **send-side only** for this session. Codex slash commands don't see a stable `session_id`, so they can't claim a peer-visible exclusivity lock — Claude Code peers will still subscribe to `<name>`. The receive side isn't actually narrowed either: `check-inbox.sh` resolves identity through `whoami.sh` (which picks the first registered agent) and has no view of the agent's in-session actas role, so Codex keeps polling whichever pair it would have without actas. The check-inbox lock filter only skips pairs *another* session owns. Treat Codex actas as a from-line override until a Codex session-id story exists. Claude Code's `/agmsg actas` does claim the lock symmetrically and is the path that exercises the full exclusivity model.
+- **Codex caveat**: on Codex, `$agmsg actas <name>` is **send-side only** for this session. Codex slash commands don't expose a stable peer-visible `session_id`, so they can't claim the same exclusivity lock that Claude Code Monitor sessions use. The turn hook still checks every exact `(team, agent)` registration for the current `(client_id, project_path, agent_type)` unless another live session owns a lock for that pair. Treat Codex actas as a from-line override until a Codex session-id story exists. Claude Code's `/agmsg actas` does claim the lock symmetrically and is the path that exercises the full exclusivity model.
 
 #### Subscription model
 
-agmsg follows a **one CC session = one active role** model. Each watcher subscribes to a *static* set of identities decided at launch:
+agmsg follows a **one CC session = one active role** model for Claude Code Monitor delivery. Each watcher subscribes to a *static* set of identities decided at launch:
 
-- **Without `actas`**: the watcher subscribes to whichever `(team, agent)` pairs were registered for this `(project, agent_type)` at the moment `watch.sh` started, *minus* any pair currently locked by another live session's `actas` claim. The set is *not* re-resolved later — a peer that claims a name after this watcher launched will start receiving exclusively, but this watcher won't notice the loss until it restarts. A role joined mid-session via `actas` from another CC does *not* start arriving in CCs that were launched before it.
+- **Without `actas`**: the watcher subscribes to whichever `(team, agent)` pairs were registered for this `(client_id, project_path, agent_type)` at the moment `watch.sh` started, *minus* any pair currently locked by another live session's `actas` claim. The set is *not* re-resolved later — a peer that claims a name after this watcher launched will start receiving exclusively, but this watcher won't notice the loss until it restarts. A role joined mid-session via `actas` from another CC does *not* start arriving in CCs that were launched before it.
 - **After `actas <name>`**: the watcher is relaunched filtered to `<name>` only, and the lock that filter implies prevents peer watchers from ever subscribing to `<name>` while this session is live.
+
+Watchers poll unread messages using per-client read receipts. Starting or restarting a watcher does not skip unread backlog for that client; a message is marked read only after the watcher prints it.
 
 This is intentional: it keeps each CC bound to one role's inbox, so a `tech-lead` window stays clear of `biz-analyst` traffic and vice versa, and the exclusivity holds across sessions on the same machine rather than per-session. To pick up a role added after a CC launched (without switching to it exclusively), restart the CC or `/clear` so SessionStart re-launches `watch.sh` with the fresh identity list — and with the up-to-date lock view.
 
@@ -373,6 +375,17 @@ client-local key (`local:<client_id>:<path-hash>`), so different machines do not
 get merged just because their paths match. Use an explicit `AGMSG_PROJECT_KEY`
 only when you intentionally want to group non-git directories across clients.
 
+### Read Receipts
+
+Unread state is scoped to the receiving client. `inbox.sh`, `check-inbox.sh`,
+and `watch.sh` mark messages read by inserting a receipt for
+`message_id + client_id`; they do not globally consume the role's inbox for
+every other machine. This matters when two clients intentionally use the same
+`team/agent` role: one client reading a message does not hide it from the other.
+
+`messages.read_at` remains as a compatibility/summary timestamp meaning "first
+read by any client". New unread checks do not use it.
+
 For anything beyond localhost, put it behind SSH forwarding, VPN, or a real
 authenticated reverse proxy. Do not expose an unauthenticated agmsgd directly
 to the public internet.
@@ -453,7 +466,7 @@ bats tests/    # requires bats-core: brew install bats-core
 
 ~/.agmsg-hub/
 ├── config.yaml                   # Client/server config
-├── db/messages.db                # Local/server SQLite store
+├── db/messages.db                # Local/server SQLite store, including per-client read receipts
 ├── teams/                        # Local fallback team configs
 └── run/                          # Watcher locks and runtime state
 
@@ -464,7 +477,7 @@ agmsg-hub/server/
 
 - **Storage**: Single SQLite file with WAL mode
 - **Remote mode**: Optional Node.js HTTP server owning a SQLite store
-- **Concurrency**: Multiple readers + 1 writer, no conflicts
+- **Concurrency**: Multiple clients can read the same role; read receipts are per-client
 - **Dependencies**: bash, sqlite3 for local mode; Node.js 24+ for server mode
 - **Auto detection**: Stop hook checks inbox after each response (60s cooldown)
 - **Default mode**: No daemon and no network; direct filesystem access

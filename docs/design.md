@@ -31,8 +31,19 @@ A role is addressed by `(team, agent)`. A client registration is identified by
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     read_at TEXT
   );
+
+  CREATE TABLE message_reads (
+    message_id INTEGER NOT NULL,
+    team TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    read_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    PRIMARY KEY (message_id, client_id)
+  );
   ```
-- Indexes on `(team, to_agent, read_at)` for unread queries and `(team, created_at)` for history
+- `messages.read_at` is a compatibility/summary timestamp: first read by any client.
+- Unread queries use `message_reads` scoped by `client_id`, so one client reading a role's message does not hide it from another client using the same role.
+- Indexes on `(team, to_agent, read_at)`, `(team, created_at)`, and `(team, agent, client_id, message_id)`.
 
 ### Team Config — JSON
 
@@ -85,14 +96,14 @@ Agent responds → Stop hook fires → check-inbox.sh runs
   ├─ No unread messages? → silent (Codex: JSON systemMessage)
   └─ Unread messages found:
        1. Build notification text
-       2. Mark messages as read_at
+       2. Insert message_reads receipts for this client
        3. Return JSON { "decision": "block", "reason": "..." }
        4. Agent sees messages in context and continues
 ```
 
 ### Cooldown
 
-A marker file (`run/.lastcheck-<agent>`) tracks the last check time. Configurable via `hook.check_interval` (default 60 seconds). It lives in the run dir (hook runtime state), not the message store, so it is unaffected by `AGMSG_STORAGE_PATH`.
+A marker file (`run/.lastcheck-<hash(team,agent,client_id)>`) tracks the last check time per resolved inbox pair. Configurable via `delivery.turn.check_interval` or legacy `hook.check_interval` (default 60 seconds). It lives in the run dir (hook runtime state), not the message store, so it is unaffected by `AGMSG_STORAGE_PATH`.
 
 ### Claude Code vs Codex
 
@@ -118,7 +129,7 @@ A marker file (`run/.lastcheck-<agent>`) tracks the last check time. Configurabl
 | `whoami.sh` | Identify agent by client, project path, and type |
 | `rename.sh` | Rename agent in config and message history |
 | `hook.sh` | Enable/disable Stop hook (on/off) |
-| `check-inbox.sh` | Hook entry point — cooldown, check, notify |
+| `check-inbox.sh` | Hook entry point — resolve all exact identities, cooldown, check, notify |
 | `config.sh` | Read/write user config (YAML) |
 
 All scripts use only `bash` and `sqlite3`. No python3 dependency.
