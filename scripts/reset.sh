@@ -18,7 +18,9 @@ SESSION_ID="${4:-}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+source "$SCRIPT_DIR/lib/client.sh"
 TEAMS_DIR="$(agmsg_teams_dir)"
+CLIENT_ID="$(agmsg_client_id)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/actas-lock.sh"
 
@@ -33,6 +35,23 @@ if [ -z "$TARGET_AGENT" ]; then
     echo "No registered identity found for this project/type." >&2
     exit 1
   fi
+fi
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  RESPONSE="$(agmsg_remote_reset "$PROJECT_PATH" "$AGENT_TYPE" "$TARGET_AGENT")"
+  TMP_RESPONSE="$(mktemp)"
+  printf '%s' "$RESPONSE" > "$TMP_RESPONSE"
+  REMOVED="$(sqlite3 :memory: "SELECT COALESCE(json_extract(readfile('$(printf '%s' "$TMP_RESPONSE" | sed "s/'/''/g")'), '$.removed'), 0);" 2>/dev/null || echo 0)"
+  TOUCHED_TEAMS="$(sqlite3 :memory: "SELECT COALESCE(json_extract(readfile('$(printf '%s' "$TMP_RESPONSE" | sed "s/'/''/g")'), '$.touched_teams'), 0);" 2>/dev/null || echo 0)"
+  rm -f "$TMP_RESPONSE"
+
+  if [ "$REMOVED" -eq 0 ]; then
+    echo "No registrations removed."
+  else
+    echo "Reset complete: removed $REMOVED registration(s) across $TOUCHED_TEAMS team(s)"
+  fi
+  exit 0
 fi
 
 if [ ! -d "$TEAMS_DIR" ]; then
@@ -76,7 +95,8 @@ for TEAM_CONFIG in "$TEAMS_DIR"/*/config.json; do
     SELECT count(*)
     FROM json_each(json_extract('$NORMALIZED_ESCAPED', '\$.registrations'))
     WHERE json_extract(value, '\$.type') = '$AGENT_TYPE'
-      AND json_extract(value, '\$.project') = '$PROJECT_PATH';
+      AND json_extract(value, '\$.project') = '$PROJECT_PATH'
+      AND COALESCE(json_extract(value, '\$.client_id'), '$CLIENT_ID') = '$CLIENT_ID';
   ")
   if [ "$MATCH_COUNT" -eq 0 ]; then
     continue
@@ -91,6 +111,7 @@ for TEAM_CONFIG in "$TEAMS_DIR"/*/config.json; do
         WHERE NOT (
           json_extract(value, '\$.type') = '$AGENT_TYPE'
           AND json_extract(value, '\$.project') = '$PROJECT_PATH'
+          AND COALESCE(json_extract(value, '\$.client_id'), '$CLIENT_ID') = '$CLIENT_ID'
         )
       ), json('[]'))
     );

@@ -175,14 +175,17 @@ The send side mirrors this: every `send.sh` call from this CC uses the active ro
 
 ### Reusing the same identity across projects
 
-If you join the same team with the same agent name from another project, agmsg keeps the same identity and adds a registration record for the new project.
+If you join the same team with the same agent name from another project on the
+same client, agmsg keeps the same role identity and adds a registration record
+for the new project.
 
 ```bash
 ~/.agents/skills/agmsg/scripts/join.sh myteam alice claude-code /path/to/project-a
 ~/.agents/skills/agmsg/scripts/join.sh myteam alice claude-code /path/to/project-b
 ```
 
-If you want to clear the current project's registrations without leaving the team identity entirely:
+If you want to clear the current client's registration for a project without
+leaving the team identity entirely:
 
 ```bash
 ~/.agents/skills/agmsg/scripts/reset.sh /path/to/project-b claude-code
@@ -332,6 +335,28 @@ AGMSG_STORAGE_DRIVER=remote \
 AGMSG_REMOTE_URL=http://127.0.0.1:8787 \
 ~/.agents/skills/agmsg/scripts/send.sh myteam alice bob "hi over remote"
 ```
+
+### Client Identity
+
+Each installed client has a stable `client_id` in `~/.agmsg-hub/client_id`.
+Registration and identity resolution use `client_id + project_path + agent_type`,
+not just the project path. This matters when two machines use the same absolute
+path, such as `/Users/2bit/prog/nozzle_proj`: they remain separate clients
+instead of silently sharing one registration.
+
+The server stores these fields for each registration:
+
+- `client_id` — stable install/client identity, generated once per client
+- `client_label` — display label, defaulting to the hostname
+- `hostname` — diagnostic host name
+- `project_path` — local path on that client
+- `project_key` — optional grouping metadata
+
+`project_key` is not used as proof of identity. For git repos it is derived from
+the origin remote when available. For non-git directories it defaults to a
+client-local key (`local:<client_id>:<path-hash>`), so different machines do not
+get merged just because their paths match. Use an explicit `AGMSG_PROJECT_KEY`
+only when you intentionally want to group non-git directories across clients.
 
 For anything beyond localhost, put it behind SSH forwarding, VPN, or a real
 authenticated reverse proxy. Do not expose an unauthenticated agmsgd directly

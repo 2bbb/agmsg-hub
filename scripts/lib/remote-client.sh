@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/client.sh"
+
 agmsg_sql_escape() {
   printf '%s' "$1" | sed "s/'/''/g"
 }
@@ -41,13 +43,26 @@ agmsg_json_read_payload() {
 }
 
 agmsg_json_join_payload() {
-  local team agent type project
+  local team agent type project client_id client_label hostname_value project_key
   team="$(agmsg_sql_escape "$1")"
   agent="$(agmsg_sql_escape "$2")"
   type="$(agmsg_sql_escape "$3")"
   project="$(agmsg_sql_escape "$4")"
+  client_id="$(agmsg_sql_escape "$(agmsg_client_id)")"
+  client_label="$(agmsg_sql_escape "$(agmsg_client_label)")"
+  hostname_value="$(agmsg_sql_escape "$(agmsg_hostname)")"
+  project_key="$(agmsg_sql_escape "$(agmsg_project_key "$4")")"
 
-  sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'type', '$type', 'project', '$project');"
+  sqlite3 :memory: "SELECT json_object(
+    'team', '$team',
+    'agent', '$agent',
+    'type', '$type',
+    'project', '$project',
+    'client_id', '$client_id',
+    'client_label', '$client_label',
+    'hostname', '$hostname_value',
+    'project_key', '$project_key'
+  );"
 }
 
 agmsg_json_role_instruction_payload() {
@@ -57,6 +72,21 @@ agmsg_json_role_instruction_payload() {
   body_file="$3"
 
   sqlite3 :memory: "SELECT json_object('team', '$team', 'agent', '$agent', 'body', CAST(readfile('$(agmsg_sql_escape "$body_file")') AS TEXT));"
+}
+
+agmsg_json_reset_payload() {
+  local project type agent client_id
+  project="$(agmsg_sql_escape "$1")"
+  type="$(agmsg_sql_escape "$2")"
+  agent="$(agmsg_sql_escape "$3")"
+  client_id="$(agmsg_sql_escape "$(agmsg_client_id)")"
+
+  sqlite3 :memory: "SELECT json_object(
+    'project', '$project',
+    'type', '$type',
+    'agent', '$agent',
+    'client_id', '$client_id'
+  );"
 }
 
 agmsg_remote_headers() {
@@ -217,6 +247,15 @@ agmsg_remote_join() {
   agmsg_remote_post "/api/v1/teams/join" "$payload"
 }
 
+agmsg_remote_reset() {
+  local project="$1"
+  local type="$2"
+  local agent="$3"
+  local payload
+  payload="$(agmsg_json_reset_payload "$project" "$type" "$agent")"
+  agmsg_remote_post "/api/v1/teams/reset" "$payload"
+}
+
 agmsg_remote_role_instruction_get() {
   local team="$1"
   local agent="$2"
@@ -251,7 +290,8 @@ agmsg_remote_team_rows() {
       json_extract(value, '$.name'),
       COALESCE(json_extract(value, '$.types'), ''),
       COALESCE(json_extract(value, '$.project'), '?'),
-      COALESCE(json_extract(value, '$.registrations'), 0)
+      COALESCE(json_extract(value, '$.registrations'), 0),
+      COALESCE(json_extract(value, '$.client_label'), '?')
     FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.members');
   "
   rm -f "$tmp"
@@ -261,13 +301,19 @@ agmsg_remote_identity_summary() {
   local project="$1"
   local type="$2"
   local response tmp
-  response="$(agmsg_remote_get "/api/v1/identities" --data-urlencode "project=$project" --data-urlencode "type=$type")"
+  response="$(agmsg_remote_get "/api/v1/identities" \
+    --data-urlencode "project=$project" \
+    --data-urlencode "type=$type" \
+    --data-urlencode "client_id=$(agmsg_client_id)")"
   tmp="$(mktemp)"
   printf '%s' "$response" > "$tmp"
 
   local exact_count agent_names team_names suggested_agents suggested_teams all_teams
   exact_count="$(sqlite3 :memory: "SELECT COUNT(*) FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.exact');")"
   all_teams="$(sqlite3 -separator ',' :memory: "SELECT GROUP_CONCAT(value) FROM json_each(readfile('$(agmsg_sql_escape "$tmp")'), '$.teams');")"
+
+  local client_id
+  client_id="$(agmsg_client_id)"
 
   if [ "$exact_count" = "0" ]; then
     suggested_agents="$(sqlite3 -separator ',' :memory: "
@@ -288,7 +334,7 @@ agmsg_remote_identity_summary() {
     ")"
     rm -f "$tmp"
     if [ -n "$suggested_agents" ]; then
-      echo "suggest=true agents=$suggested_agents teams=$suggested_teams type=$type project=$project available_teams=${all_teams:-none}"
+      echo "suggest=true agents=$suggested_agents teams=$suggested_teams type=$type project=$project client=$client_id available_teams=${all_teams:-none}"
     else
       echo "not_joined=true available_teams=${all_teams:-none}"
     fi
@@ -314,8 +360,8 @@ agmsg_remote_identity_summary() {
   rm -f "$tmp"
 
   if [ "$(printf '%s' "$agent_names" | awk -F, '{print NF}')" -eq 1 ]; then
-    echo "agent=$agent_names teams=$team_names type=$type project=$project"
+    echo "agent=$agent_names teams=$team_names type=$type project=$project client=$client_id"
   else
-    echo "multiple=true agents=$agent_names teams=$team_names type=$type project=$project"
+    echo "multiple=true agents=$agent_names teams=$team_names type=$type project=$project client=$client_id"
   fi
 }

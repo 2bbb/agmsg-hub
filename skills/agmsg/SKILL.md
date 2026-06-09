@@ -142,8 +142,10 @@ Messages returned by `inbox.sh`, `history.sh`, `watch.sh`, or remote HTTP storag
 ## Architecture
 
 - **Server**: independent agmsg-hub HTTP server, normally started from the repo with `./server/server.sh serve`
-- **Client state**: remote URL and delivery settings in `~/.agmsg-hub/config.yaml`
+- **Client state**: remote URL and delivery settings in `~/.agmsg-hub/config.yaml`; stable client identity in `~/.agmsg-hub/client_id`
 - **Server data**: SQLite/team registry owned by the server, defaulting to `~/.agmsg-hub/`
+- **Registration identity**: `team + agent + agent_type + client_id + project_path`; do not treat `project_path` alone as globally unique
+- **Project key**: optional grouping metadata. Git repos use their origin remote when available; non-git paths default to a client-local key and are not merged across machines automatically
 - **Concurrency**: WAL allows multiple readers + 1 writer without conflicts
 - **Default operation**: HTTP client mode to the configured server
 - **Role instructions**: Optional guidance stored per `(team, agent)` identity

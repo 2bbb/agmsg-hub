@@ -4,11 +4,13 @@ Developer documentation for contributors and maintainers.
 
 ## Identity Model
 
-An agent is identified by `(name, team)`. Project path and agent type (claude-code, codex, gemini) are metadata — reference information stored alongside the identity but not part of it.
+A role is addressed by `(team, agent)`. A client registration is identified by
+`team + agent + agent_type + client_id + project_path`.
 
-- An agent can be registered from multiple projects under the same name
-- `whoami.sh` uses project path and type to suggest an identity, but the user can choose any name
-- See [#15](https://github.com/2bbb/agmsg-hub/issues/15) for the ongoing identity redesign
+- An agent can be registered from multiple projects under the same name.
+- A single absolute `project_path` is not globally unique across machines.
+- `whoami.sh` resolves the current role with `client_id + project_path + type`.
+- `project_key` is optional grouping metadata, not authentication or identity.
 
 ## Data Storage
 
@@ -40,7 +42,18 @@ An agent is identified by `(name, team)`. Project path and agent type (claude-co
 {
   "name": "myteam",
   "agents": {
-    "alice": { "type": "claude-code", "project": "/path/to/project" }
+    "alice": {
+      "registrations": [
+        {
+          "type": "claude-code",
+          "project": "/path/to/project",
+          "client_id": "client-uuid",
+          "client_label": "mac-mini",
+          "hostname": "mac-mini",
+          "project_key": "git:https://github.com/2bbb/example.git"
+        }
+      ]
+    }
   },
   "created_at": "2026-01-01T00:00:00Z"
 }
@@ -102,7 +115,7 @@ A marker file (`run/.lastcheck-<agent>`) tracks the last check time. Configurabl
 | `join.sh` | Add agent to team (create team if needed) |
 | `leave.sh` | Remove agent from team (delete team if empty) |
 | `team.sh` | List team members |
-| `whoami.sh` | Identify agent by project path and type |
+| `whoami.sh` | Identify agent by client, project path, and type |
 | `rename.sh` | Rename agent in config and message history |
 | `hook.sh` | Enable/disable Stop hook (on/off) |
 | `check-inbox.sh` | Hook entry point — cooldown, check, notify |
@@ -140,3 +153,26 @@ Claude Code command is installed separately to `~/.claude/commands/<cmd>.md`.
 
 Local mode has no python3, no node, no network, and no daemon. Remote server
 mode is optional and requires Node.js 24+ on the server host.
+
+## Client identity
+
+Remote mode must not use `project_path` as a global identity. Two machines can
+legitimately have the same absolute path, so agmsg-hub assigns each client
+install a stable `client_id` in `~/.agmsg-hub/client_id`.
+
+Registrations are keyed by:
+
+```text
+team + agent + agent_type + client_id + project_path
+```
+
+`client_label` and `hostname` are display/diagnostic fields. `project_key` is
+grouping metadata only:
+
+- git repo with origin remote: `git:<remote-url>`
+- git repo without remote: `git-local:<hash(realpath)>`
+- non-git path: `local:<client_id>:<hash(realpath)>`
+
+That last default is intentionally client-local. Automatically merging non-git
+directories across machines is false precision; users can opt into grouping with
+`AGMSG_PROJECT_KEY` when they know two directories represent the same project.

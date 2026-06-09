@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Show agent identity in id(1) style.
-# Single match:    agent=<name> teams=<t1,t2,...> type=<type> project=<path>
-# Multiple match:  multiple=true agents=<n1,n2,...> teams=<t1,t2,...> type=<type> project=<path>
-# Suggestions:     suggest=true agents=<n1,n2,...> teams=<t1,t2,...> type=<type> project=<path> available_teams=<...>
+# Single match:    agent=<name> teams=<t1,t2,...> type=<type> project=<path> client=<client_id>
+# Multiple match:  multiple=true agents=<n1,n2,...> teams=<t1,t2,...> type=<type> project=<path> client=<client_id>
+# Suggestions:     suggest=true agents=<n1,n2,...> teams=<t1,t2,...> type=<type> project=<path> client=<client_id> available_teams=<...>
 # Not joined:      not_joined=true available_teams=<t1,t2,...> (or "none")
 #
 # Usage: whoami.sh <project_path> [type]
@@ -80,6 +80,8 @@ AGENT_TYPE="${2:-$(detect_cli_type)}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+source "$SCRIPT_DIR/lib/client.sh"
+CLIENT_ID="$(agmsg_client_id)"
 
 if agmsg_using_remote_storage; then
   source "$SCRIPT_DIR/lib/remote-client.sh"
@@ -127,7 +129,8 @@ for config_file in "$TEAMS_DIR"/*/config.json; do
     )
     SELECT DISTINCT name
     FROM agents, json_each(agents.registrations) AS r
-    WHERE json_extract(r.value, '\$.type') = '$AGENT_TYPE';
+    WHERE json_extract(r.value, '\$.type') = '$AGENT_TYPE'
+      AND COALESCE(json_extract(r.value, '\$.client_id'), '$CLIENT_ID') = '$CLIENT_ID';
   ")
 done
 
@@ -140,7 +143,7 @@ if [ -z "$EXACT_MATCHES" ]; then
   # SUGGESTED_MATCHES is "team\tagent" per line; preserve that order.
   AGENT_NAMES=$(echo "$SUGGESTED_MATCHES" | cut -f2 | awk '!seen[$0]++' | paste -sd, -)
   TEAM_NAMES=$(echo "$SUGGESTED_MATCHES" | cut -f1 | awk '!seen[$0]++' | paste -sd, -)
-  echo "suggest=true agents=$AGENT_NAMES teams=$TEAM_NAMES type=$AGENT_TYPE project=$PROJECT_PATH available_teams=${ALL_TEAMS:-none}"
+  echo "suggest=true agents=$AGENT_NAMES teams=$TEAM_NAMES type=$AGENT_TYPE project=$PROJECT_PATH client=$CLIENT_ID available_teams=${ALL_TEAMS:-none}"
   exit 0
 fi
 
@@ -150,7 +153,7 @@ AGENT_NAMES=$(echo "$EXACT_MATCHES" | cut -f2 | awk '!seen[$0]++' | paste -sd, -
 AGENT_COUNT=$(echo "$EXACT_MATCHES" | cut -f2 | sort -u | wc -l | tr -d ' ')
 
 if [ "$AGENT_COUNT" -eq 1 ]; then
-  echo "agent=$AGENT_NAMES teams=$TEAM_NAMES type=$AGENT_TYPE project=$PROJECT_PATH"
+  echo "agent=$AGENT_NAMES teams=$TEAM_NAMES type=$AGENT_TYPE project=$PROJECT_PATH client=$CLIENT_ID"
 else
-  echo "multiple=true agents=$AGENT_NAMES teams=$TEAM_NAMES type=$AGENT_TYPE project=$PROJECT_PATH"
+  echo "multiple=true agents=$AGENT_NAMES teams=$TEAM_NAMES type=$AGENT_TYPE project=$PROJECT_PATH client=$CLIENT_ID"
 fi

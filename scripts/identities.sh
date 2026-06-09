@@ -18,7 +18,9 @@ AGENT_TYPE="${2:?Missing agent_type}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+source "$SCRIPT_DIR/lib/client.sh"
 TEAMS_DIR="$(agmsg_teams_dir)"
+CLIENT_ID="$(agmsg_client_id)"
 
 [ -d "$TEAMS_DIR" ] || exit 0
 
@@ -44,6 +46,7 @@ for config_file in "$TEAMS_DIR"/*/config.json; do
     FROM agents, json_each(agents.registrations) AS r
     WHERE json_extract(r.value, '\$.project') = '$PROJECT_PATH'
       AND json_extract(r.value, '\$.type') = '$AGENT_TYPE'
+      AND COALESCE(json_extract(r.value, '\$.client_id'), '$CLIENT_ID') = '$CLIENT_ID'
     ORDER BY team, name;
   "
 done

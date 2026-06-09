@@ -14,12 +14,12 @@ if agmsg_using_remote_storage; then
   echo "Team: $TEAM"
   echo ""
   COUNT=0
-  while IFS='	' read -r name types project registrations; do
+  while IFS='	' read -r name types project registrations client_label; do
     [ -n "$name" ] || continue
     if [ "${registrations:-0}" -gt 1 ]; then
-      echo "  $name ($types) — $project (+$((registrations - 1)) more)"
+      echo "  $name ($types) — ${client_label:-?}: $project (+$((registrations - 1)) more)"
     else
-      echo "  $name ($types) — $project"
+      echo "  $name ($types) — ${client_label:-?}: $project"
     fi
     COUNT=$((COUNT + 1))
   done < <(agmsg_remote_team_rows "$TEAM")
@@ -39,11 +39,11 @@ echo "Team: $TEAM"
 echo ""
 
 COUNT=0
-while IFS='	' read -r name types project registrations; do
+while IFS='	' read -r name types project registrations client_label; do
   if [ "${registrations:-0}" -gt 1 ]; then
-    echo "  $name ($types) — $project (+$((registrations - 1)) more)"
+    echo "  $name ($types) — ${client_label:-?}: $project (+$((registrations - 1)) more)"
   else
-    echo "  $name ($types) — $project"
+    echo "  $name ($types) — ${client_label:-?}: $project"
   fi
   COUNT=$((COUNT + 1))
 done < <(sqlite3 -separator '	' :memory: \
@@ -66,7 +66,13 @@ done < <(sqlite3 -separator '	' :memory: \
        ORDER BY CAST(r2.key AS INTEGER) DESC
        LIMIT 1
      ), '?'),
-     json_array_length(registrations)
+     json_array_length(registrations),
+     COALESCE((
+       SELECT json_extract(r2.value, '$.client_label')
+       FROM json_each(agents.registrations) AS r2
+       ORDER BY CAST(r2.key AS INTEGER) DESC
+       LIMIT 1
+     ), '?')
    FROM agents, json_each(agents.registrations) AS r
    GROUP BY name, registrations;")
 

@@ -153,6 +153,23 @@ teardown() {
   [[ "$output" =~ "available_teams=myteam" ]]
 }
 
+@test "whoami: does not treat same path on another client as current identity" {
+  AGMSG_CLIENT_ID=client-a AGMSG_CLIENT_LABEL=alpha bash "$SCRIPTS/join.sh" myteam alice codex /tmp/shared-proj
+  AGMSG_CLIENT_ID=client-b AGMSG_CLIENT_LABEL=beta bash "$SCRIPTS/join.sh" myteam bob codex /tmp/shared-proj
+
+  AGMSG_CLIENT_ID=client-a run bash "$SCRIPTS/whoami.sh" /tmp/shared-proj codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=alice" ]]
+  [[ "$output" =~ "client=client-a" ]]
+  [[ ! "$output" =~ "bob" ]]
+
+  AGMSG_CLIENT_ID=client-b run bash "$SCRIPTS/whoami.sh" /tmp/shared-proj codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=bob" ]]
+  [[ "$output" =~ "client=client-b" ]]
+  [[ ! "$output" =~ "alice" ]]
+}
+
 @test "whoami: auto-detects claude-code from CLAUDE_CODE_SESSION_ID env" {
   bash "$SCRIPTS/join.sh" myteam alice claude-code /tmp/proj
   CLAUDE_CODE_SESSION_ID=test-session run bash "$SCRIPTS/whoami.sh" /tmp/proj
@@ -222,6 +239,21 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "removed 1 registration" ]]
   [ ! -d "$TEST_SKILL_DIR/teams/myteam" ]
+}
+
+@test "reset: removes only the current client registration for the same path" {
+  AGMSG_CLIENT_ID=client-a AGMSG_CLIENT_LABEL=alpha bash "$SCRIPTS/join.sh" myteam alice codex /tmp/shared-proj
+  AGMSG_CLIENT_ID=client-b AGMSG_CLIENT_LABEL=beta bash "$SCRIPTS/join.sh" myteam bob codex /tmp/shared-proj
+
+  AGMSG_CLIENT_ID=client-a run bash "$SCRIPTS/reset.sh" /tmp/shared-proj codex alice
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "removed 1 registration" ]]
+
+  AGMSG_CLIENT_ID=client-a run bash "$SCRIPTS/whoami.sh" /tmp/shared-proj codex
+  [[ "$output" =~ "not_joined=true" ]]
+
+  AGMSG_CLIENT_ID=client-b run bash "$SCRIPTS/whoami.sh" /tmp/shared-proj codex
+  [[ "$output" =~ "agent=bob" ]]
 }
 
 # --- rename-team.sh ---

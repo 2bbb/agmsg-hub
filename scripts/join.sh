@@ -21,6 +21,7 @@ esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
+source "$SCRIPT_DIR/lib/client.sh"
 
 if agmsg_using_remote_storage; then
   source "$SCRIPT_DIR/lib/remote-client.sh"
@@ -54,7 +55,18 @@ fi
 
 # --- Add or extend agent registrations ---
 CONFIG_ESCAPED=$(sed "s/'/''/g" "$TEAM_CONFIG")
-REGISTRATION="{\"type\":\"$AGENT_TYPE\",\"project\":\"$PROJECT_PATH\"}"
+CLIENT_ID="$(agmsg_client_id)"
+CLIENT_LABEL="$(agmsg_client_label)"
+HOSTNAME_VALUE="$(agmsg_hostname)"
+PROJECT_KEY="$(agmsg_project_key "$PROJECT_PATH")"
+REGISTRATION=$(sqlite3 :memory: "SELECT json_object(
+  'type', '$(printf '%s' "$AGENT_TYPE" | sed "s/'/''/g")',
+  'project', '$(printf '%s' "$PROJECT_PATH" | sed "s/'/''/g")',
+  'client_id', '$(printf '%s' "$CLIENT_ID" | sed "s/'/''/g")',
+  'client_label', '$(printf '%s' "$CLIENT_LABEL" | sed "s/'/''/g")',
+  'hostname', '$(printf '%s' "$HOSTNAME_VALUE" | sed "s/'/''/g")',
+  'project_key', '$(printf '%s' "$PROJECT_KEY" | sed "s/'/''/g")'
+);")
 REGISTRATION_ESCAPED=$(printf '%s' "$REGISTRATION" | sed "s/'/''/g")
 
 EXISTING=$(sqlite3 :memory: ".param set :json '$CONFIG_ESCAPED'" \
@@ -86,6 +98,7 @@ else
       FROM json_each(json_extract('$NORMALIZED_ESCAPED', '\$.registrations'))
       WHERE json_extract(value, '\$.type') = '$AGENT_TYPE'
         AND json_extract(value, '\$.project') = '$PROJECT_PATH'
+        AND COALESCE(json_extract(value, '\$.client_id'), '$CLIENT_ID') = '$CLIENT_ID'
     );
   ")
 

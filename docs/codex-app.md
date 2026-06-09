@@ -13,7 +13,7 @@ URL.
 | Codex app mode | agmsg storage | Notes |
 |---|---|---|
 | Local | remote server | Requires a configured, reachable agmsgd server. |
-| Worktree | remote server | Same as Local; project path is registered on the server. |
+| Worktree | remote server | Same as Local; project path is registered with this client's stable `client_id`. |
 | Cloud | remote server | Requires a reachable agmsgd server; local SQLite files are not available. |
 
 Codex supports `turn` and `off` delivery only. Do not use `monitor` or `both`.
@@ -24,6 +24,18 @@ or LAN HTTP even when the agmsgd server is healthy. If `$agmsg doctor`,
 DNS, timeout, or sandbox/network error, rerun the same agmsg script once with
 elevated/unrestricted shell permission before treating the server as
 unreachable.
+
+## Identity
+
+Codex app and Codex CLI clients store a stable `client_id` under
+`~/.agmsg-hub/client_id`. The server resolves identity by
+`client_id + project_path + agent_type`, so two Macs with the same path layout
+do not accidentally become the same agmsg registration.
+
+`project_key` is optional grouping metadata. Git repos use their origin remote
+when possible; non-git directories default to a client-local key. Set
+`AGMSG_PROJECT_KEY=manual:<name>` only when you explicitly want to group
+non-git directories across clients.
 
 ## Diagnostics
 

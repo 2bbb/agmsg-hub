@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 const API_VERSION = 'v1';
-const SERVER_VERSION = '0.1.0';
+const SERVER_VERSION = '0.2.0';
 const WEB_UI_HTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -188,6 +188,20 @@ const WEB_UI_HTML = `<!doctype html>
       font-size: 14px;
       padding: 10px 0;
     }
+    .client-list {
+      display: grid;
+      gap: 4px;
+      min-width: 260px;
+    }
+    .client-line {
+      display: grid;
+      gap: 1px;
+    }
+    .client-meta {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
     @media (max-width: 760px) {
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -308,6 +322,34 @@ const WEB_UI_HTML = `<!doctype html>
       return String(value ?? "");
     }
 
+    function latestProject(member) {
+      const clients = member.clients || [];
+      if (clients.length > 0) return clients[clients.length - 1].project || member.project || "";
+      return member.project || "";
+    }
+
+    function renderClientsCell(td, member) {
+      const clients = member.clients || [];
+      if (clients.length === 0) {
+        td.textContent = escapeText(member.registrations || 0);
+        return;
+      }
+      const list = document.createElement("div");
+      list.className = "client-list";
+      for (const client of clients) {
+        const line = document.createElement("div");
+        line.className = "client-line";
+        const head = document.createElement("div");
+        head.textContent = [client.type, client.client_label || client.hostname || client.client_id].filter(Boolean).join(" / ");
+        const meta = document.createElement("div");
+        meta.className = "client-meta";
+        meta.textContent = client.project || "";
+        line.append(head, meta);
+        list.append(line);
+      }
+      td.append(list);
+    }
+
     async function loadHealth() {
       try {
         const health = await api("/api/v1/health");
@@ -376,17 +418,20 @@ const WEB_UI_HTML = `<!doctype html>
         state.selectedAgent = members[0].name;
       }
       const table = document.createElement("table");
-      table.innerHTML = "<thead><tr><th>Name</th><th>Types</th><th>Project</th><th>Regs</th><th></th></tr></thead><tbody></tbody>";
+      table.innerHTML = "<thead><tr><th>Name</th><th>Types</th><th>Latest Project</th><th>Clients</th><th></th></tr></thead><tbody></tbody>";
       for (const member of members) {
         const tr = document.createElement("tr");
         if (member.name === state.selectedAgent) {
           tr.className = "selected-row";
         }
-        for (const value of [member.name, member.types, member.project, member.registrations]) {
+        for (const value of [member.name, member.types, latestProject(member)]) {
           const td = document.createElement("td");
           td.textContent = escapeText(value);
           tr.append(td);
         }
+        const clients = document.createElement("td");
+        renderClientsCell(clients, member);
+        tr.append(clients);
         const action = document.createElement("td");
         const button = document.createElement("button");
         button.className = "select-button";
@@ -606,21 +651,6 @@ function initDb(path) {
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
 
-    CREATE TABLE IF NOT EXISTS registrations (
-      team TEXT NOT NULL,
-      agent TEXT NOT NULL,
-      agent_type TEXT NOT NULL,
-      project_path TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-      PRIMARY KEY (team, agent, agent_type, project_path),
-      FOREIGN KEY (team) REFERENCES teams(name) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_registrations_project
-      ON registrations(project_path, agent_type);
-    CREATE INDEX IF NOT EXISTS idx_registrations_team_agent
-      ON registrations(team, agent);
-
     CREATE TABLE IF NOT EXISTS role_instructions (
       team TEXT NOT NULL,
       agent TEXT NOT NULL,
@@ -630,7 +660,85 @@ function initDb(path) {
       FOREIGN KEY (team) REFERENCES teams(name) ON DELETE CASCADE
     );
   `);
+  ensureRegistrationsTable(db);
   return db;
+}
+
+function createRegistrationsTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS registrations (
+      team TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      agent_type TEXT NOT NULL,
+      project_path TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      client_label TEXT NOT NULL DEFAULT '',
+      hostname TEXT,
+      project_key TEXT,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (team, agent, agent_type, client_id, project_path),
+      FOREIGN KEY (team) REFERENCES teams(name) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_registrations_project
+      ON registrations(client_id, project_path, agent_type);
+    CREATE INDEX IF NOT EXISTS idx_registrations_team_agent
+      ON registrations(team, agent);
+    CREATE INDEX IF NOT EXISTS idx_registrations_project_key
+      ON registrations(project_key);
+  `);
+}
+
+function ensureRegistrationsTable(db) {
+  const columns = db.prepare('PRAGMA table_info(registrations)').all().map((row) => row.name);
+  if (columns.length === 0) {
+    createRegistrationsTable(db);
+    return;
+  }
+
+  const hasClientId = columns.includes('client_id');
+  if (hasClientId) {
+    if (!columns.includes('client_label')) {
+      db.exec("ALTER TABLE registrations ADD COLUMN client_label TEXT NOT NULL DEFAULT ''");
+    }
+    if (!columns.includes('hostname')) {
+      db.exec('ALTER TABLE registrations ADD COLUMN hostname TEXT');
+    }
+    if (!columns.includes('project_key')) {
+      db.exec('ALTER TABLE registrations ADD COLUMN project_key TEXT');
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_registrations_project
+        ON registrations(client_id, project_path, agent_type);
+      CREATE INDEX IF NOT EXISTS idx_registrations_team_agent
+        ON registrations(team, agent);
+      CREATE INDEX IF NOT EXISTS idx_registrations_project_key
+        ON registrations(project_key);
+    `);
+    return;
+  }
+
+  const legacyRows = db.prepare('SELECT * FROM registrations').all();
+  db.exec('DROP TABLE registrations');
+  createRegistrationsTable(db);
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO registrations
+      (team, agent, agent_type, project_path, client_id, client_label, hostname, project_key, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of legacyRows) {
+    insert.run(
+      row.team,
+      row.agent,
+      row.agent_type,
+      row.project_path,
+      'legacy',
+      'legacy',
+      null,
+      null,
+      row.created_at || new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    );
+  }
 }
 
 function jsonResponse(res, status, payload) {
@@ -746,6 +854,10 @@ function createHandler({ db, token, verbose }) {
     }
     if (req.method === 'POST' && url.pathname === '/api/v1/teams/join') {
       await handleJoin(req, res, db);
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/v1/teams/reset') {
+      await handleReset(req, res, db);
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/v1/teams') {
@@ -899,17 +1011,26 @@ async function handleJoin(req, res, db) {
   const agent = payload.agent || '';
   const agentType = payload.type || payload.agent_type || '';
   const project = payload.project || payload.project_path || '';
-  if (!team || !agent || !agentType || !project) {
-    errorResponse(res, 400, 'missing_field', 'team, agent, type, and project are required');
+  const clientId = payload.client_id || '';
+  const clientLabel = payload.client_label || clientId;
+  const hostname = payload.hostname || null;
+  const projectKey = payload.project_key || null;
+  if (!team || !agent || !agentType || !project || !clientId) {
+    errorResponse(res, 400, 'missing_field', 'team, agent, type, project, and client_id are required');
     return;
   }
 
   const existingTeam = db.prepare('SELECT name FROM teams WHERE name = ?').get(team);
   db.prepare('INSERT OR IGNORE INTO teams (name) VALUES (?)').run(team);
   db.prepare(`
-    INSERT OR IGNORE INTO registrations (team, agent, agent_type, project_path)
-    VALUES (?, ?, ?, ?)
-  `).run(team, agent, agentType, project);
+    INSERT INTO registrations
+      (team, agent, agent_type, project_path, client_id, client_label, hostname, project_key)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(team, agent, agent_type, client_id, project_path) DO UPDATE SET
+      client_label = excluded.client_label,
+      hostname = excluded.hostname,
+      project_key = excluded.project_key
+  `).run(team, agent, agentType, project, clientId, clientLabel, hostname, projectKey);
 
   jsonResponse(res, 200, {
     team,
@@ -957,6 +1078,13 @@ function handleTeamMembers(url, res, db) {
         ORDER BY r2.rowid DESC
         LIMIT 1
       ), '?') AS project,
+      COALESCE((
+        SELECT r2.client_label
+        FROM registrations r2
+        WHERE r2.team = r.team AND r2.agent = r.agent
+        ORDER BY r2.rowid DESC
+        LIMIT 1
+      ), '?') AS client_label,
       COUNT(*) AS registrations
     FROM registrations r
     WHERE r.team = ?
@@ -964,7 +1092,92 @@ function handleTeamMembers(url, res, db) {
     ORDER BY r.agent ASC
   `).all(team);
 
-  jsonResponse(res, 200, { team, members: rows });
+  const registrationRows = db.prepare(`
+    SELECT agent, agent_type, project_path, client_id, client_label, hostname, project_key, created_at
+    FROM registrations
+    WHERE team = ?
+    ORDER BY agent ASC, client_label ASC, project_path ASC
+  `).all(team);
+  const registrationsByAgent = new Map();
+  for (const row of registrationRows) {
+    if (!registrationsByAgent.has(row.agent)) {
+      registrationsByAgent.set(row.agent, []);
+    }
+    registrationsByAgent.get(row.agent).push({
+      type: row.agent_type,
+      project: row.project_path,
+      client_id: row.client_id,
+      client_label: row.client_label,
+      hostname: row.hostname,
+      project_key: row.project_key,
+      created_at: row.created_at,
+    });
+  }
+
+  jsonResponse(res, 200, {
+    team,
+    members: rows.map((row) => ({
+      ...row,
+      clients: registrationsByAgent.get(row.name) || [],
+    })),
+  });
+}
+
+async function handleReset(req, res, db) {
+  const payload = await readJson(req);
+  if (payload === null) {
+    errorResponse(res, 400, 'invalid_json', 'request body is not valid JSON');
+    return;
+  }
+
+  const project = payload.project || payload.project_path || '';
+  const agentType = payload.type || payload.agent_type || '';
+  const clientId = payload.client_id || '';
+  const agent = payload.agent || '';
+  if (!project || !agentType || !clientId) {
+    errorResponse(res, 400, 'missing_field', 'project, type, and client_id are required');
+    return;
+  }
+
+  let touchedTeams;
+  let result;
+  if (agent) {
+    touchedTeams = db.prepare(`
+      SELECT COUNT(DISTINCT team) AS count
+      FROM registrations
+      WHERE project_path = ? AND agent_type = ? AND client_id = ? AND agent = ?
+    `).get(project, agentType, clientId, agent).count;
+    result = db.prepare(`
+      DELETE FROM registrations
+      WHERE project_path = ? AND agent_type = ? AND client_id = ? AND agent = ?
+    `).run(project, agentType, clientId, agent);
+  } else {
+    touchedTeams = db.prepare(`
+      SELECT COUNT(DISTINCT team) AS count
+      FROM registrations
+      WHERE project_path = ? AND agent_type = ? AND client_id = ?
+    `).get(project, agentType, clientId).count;
+    result = db.prepare(`
+      DELETE FROM registrations
+      WHERE project_path = ? AND agent_type = ? AND client_id = ?
+    `).run(project, agentType, clientId);
+  }
+
+  const emptyTeams = db.prepare(`
+    SELECT teams.name AS name
+    FROM teams
+    LEFT JOIN registrations ON registrations.team = teams.name
+    GROUP BY teams.name
+    HAVING COUNT(registrations.agent) = 0
+  `).all();
+  for (const row of emptyTeams) {
+    db.prepare('DELETE FROM teams WHERE name = ?').run(row.name);
+  }
+
+  jsonResponse(res, 200, {
+    removed: result.changes,
+    touched_teams: touchedTeams,
+  });
 }
 
 function requireRegisteredAgent(res, db, team, agent) {
@@ -1039,8 +1252,9 @@ async function handleSetRoleInstruction(req, res, db) {
 function handleIdentities(url, res, db) {
   const project = url.searchParams.get('project') || '';
   const agentType = url.searchParams.get('type') || '';
-  if (!project || !agentType) {
-    errorResponse(res, 400, 'missing_field', 'project and type are required');
+  const clientId = url.searchParams.get('client_id') || '';
+  if (!project || !agentType || !clientId) {
+    errorResponse(res, 400, 'missing_field', 'project, type, and client_id are required');
     return;
   }
 
@@ -1048,15 +1262,15 @@ function handleIdentities(url, res, db) {
   const exact = db.prepare(`
     SELECT team, agent
     FROM registrations
-    WHERE project_path = ? AND agent_type = ?
+    WHERE project_path = ? AND agent_type = ? AND client_id = ?
     ORDER BY team ASC, agent ASC
-  `).all(project, agentType);
+  `).all(project, agentType, clientId);
   const suggested = db.prepare(`
     SELECT DISTINCT team, agent
     FROM registrations
-    WHERE agent_type = ? AND NOT (project_path = ?)
+    WHERE agent_type = ? AND client_id = ? AND NOT (project_path = ?)
     ORDER BY team ASC, agent ASC
-  `).all(agentType, project);
+  `).all(agentType, clientId, project);
 
   jsonResponse(res, 200, { exact, suggested, teams });
 }

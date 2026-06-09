@@ -56,6 +56,7 @@ CODEX_CONFIG="${AGMSG_CODEX_CONFIG:-$HOME/.codex/config.toml}"
 
 source "$SCRIPT_DIR/lib/codex-config.sh"
 source "$SCRIPT_DIR/lib/storage.sh"
+source "$SCRIPT_DIR/lib/client.sh"
 
 failures=0
 warnings=0
@@ -216,6 +217,8 @@ if [ "$PORCELAIN" = false ]; then
   printf 'agmsg doctor\n'
   printf 'skill_dir: %s\n' "$SKILL_DIR"
   printf 'hub_home: %s\n' "$(agmsg_home)"
+  printf 'client_id: %s\n' "$(agmsg_client_id)"
+  printf 'client_label: %s\n' "$(agmsg_client_label)"
   printf 'project: %s\n' "$PROJECT_PATH"
   printf 'agent_type: %s\n' "$AGENT_TYPE"
   if [ "$AGENT_TYPE" = "codex" ]; then
@@ -238,6 +241,11 @@ check_executable "$SCRIPT_DIR/delivery.sh" "delivery.sh" "script.delivery"
 check_executable "$SCRIPT_DIR/remote.sh" "remote.sh" "script.remote"
 check_executable "$SCRIPT_DIR/role-instructions.sh" "role-instructions.sh" "script.role_instructions"
 check_command sqlite3 sqlite3 "dependency.sqlite3"
+if [ -n "$(agmsg_client_id)" ]; then
+  ok "client.id" "client_id present"
+else
+  fail "client.id" "client_id missing"
+fi
 check_writable_dir "$(agmsg_home)" "hub data directory" "storage.hub_home"
 check_writable_dir "$(agmsg_storage_dir)" "db directory" "storage.db_dir"
 check_writable_dir "$(agmsg_teams_dir)" "teams directory" "storage.teams_dir"

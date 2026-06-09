@@ -9,6 +9,7 @@
 - `$agmsg` は **Codex で作業する repo 内**で使う。
 - remote server は `agmsgd`。Codex CLI や Codex.app は server ではなく client/agent。
 - server は独立。message DB、team/agent registry、role instruction は server 側に集約する。skill は指定 server に join する client。
+- client は `~/.agmsg-hub/client_id` を持つ。同じ絶対 path を複数 machine で使っても、`client_id + project_path + type` で別 registration として扱う。
 
 ## Install
 
@@ -90,7 +91,7 @@ curl -fsS http://<server-host>.local:8787/api/v1/health
 期待値:
 
 ```json
-{"ok":true,"api_version":"v1","server_version":"0.1.0","storage":"sqlite"}
+{"ok":true,"api_version":"v1","server_version":"0.2.0","storage":"sqlite"}
 ```
 
 `--host 0.0.0.0` は listen 用。client の URL には `0.0.0.0` を使わない。client は `127.0.0.1` か `<server-host>.local` を使う。
@@ -176,6 +177,46 @@ cd /Users/2bit/prog/nozzle_proj
 ```
 
 同じ project/type/agent で再 join しても重複登録にはならない。別 client や別 project から使う場合は、その client/project でも join する。
+
+### Client identity と project_key
+
+agmsg-hub は `project_path` だけを identity として扱わない。同じ path 構造をした別 machine が普通にあり得るため。
+
+client 側では初回利用時に:
+
+```text
+~/.agmsg-hub/client_id
+```
+
+が生成される。`whoami`, `join`, `reset` はこの `client_id` を server に渡す。
+
+登録の実体は概念的には:
+
+```text
+team + agent + agent_type + client_id + project_path
+```
+
+で一意になる。表示用に `client_label` も送る。デフォルトは hostname。テストや一時切り分けでは:
+
+```bash
+AGMSG_CLIENT_ID=client-a AGMSG_CLIENT_LABEL=mac-mini ~/.agents/skills/agmsg/scripts/join.sh ...
+```
+
+のように override できる。
+
+`project_key` は補助メタデータであって、本人確認には使わない。
+
+- git repo で origin remote があれば `git:<remote-url>`
+- git repo だが remote がなければ `git-local:<path-hash>`
+- git でなければ `local:<client_id>:<path-hash>`
+
+非 git directory を複数 client 間で同じ project として UI 上 group したい場合だけ、明示的に:
+
+```bash
+AGMSG_PROJECT_KEY=manual:nozzle-proj ~/.agents/skills/agmsg/scripts/join.sh ...
+```
+
+を使う。デフォルトでは別 machine の非 git directory を勝手に同一 project 扱いしない。
 
 ## Role instruction
 

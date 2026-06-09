@@ -56,6 +56,8 @@ wait_for_http() {
   [[ "$output" =~ 'id="teams"' ]]
   [[ "$output" =~ "/api/v1/teams" ]]
   [[ "$output" =~ "/api/v1/role-instructions" ]]
+  [[ "$output" =~ "Clients" ]]
+  [[ ! "$output" =~ "Regs" ]]
 }
 
 @test "remote storage: env-selected send, inbox, read, and history roundtrip" {
@@ -139,6 +141,46 @@ wait_for_http() {
   [[ "$output" =~ "suggest=true" ]]
   [[ "$output" =~ "agents=alice,bob" ]]
   [[ "$output" =~ "available_teams=testteam" ]]
+}
+
+@test "remote storage: same project path on different clients stays distinct" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-a AGMSG_CLIENT_LABEL=alpha \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/shared-proj
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-b AGMSG_CLIENT_LABEL=beta \
+    bash "$SCRIPTS/join.sh" testteam bob codex /tmp/shared-proj
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-a \
+    bash "$SCRIPTS/whoami.sh" /tmp/shared-proj codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=alice" ]]
+  [[ "$output" =~ "client=client-a" ]]
+  [[ ! "$output" =~ "bob" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-b \
+    bash "$SCRIPTS/whoami.sh" /tmp/shared-proj codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=bob" ]]
+  [[ "$output" =~ "client=client-b" ]]
+  [[ ! "$output" =~ "alice" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-a \
+    bash "$SCRIPTS/reset.sh" /tmp/shared-proj codex alice
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "removed 1 registration" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=client-b \
+    bash "$SCRIPTS/whoami.sh" /tmp/shared-proj codex
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "agent=bob" ]]
 }
 
 @test "remote storage: role instructions roundtrip via API and script" {
