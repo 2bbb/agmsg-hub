@@ -8,7 +8,7 @@
 - `install.sh` は clone 済みの **agmsg-hub repo 内**で実行する開発/手動 install 用。
 - `$agmsg` は **Codex で作業する repo 内**で使う。
 - remote server は `agmsgd`。Codex CLI や Codex.app は server ではなく client/agent。
-- remote mode では message DB、team/agent registry、role instruction が server 側に集まる。local mode では従来通り各 client の `~/.agents/skills/agmsg/teams/` を使う。
+- server は独立。message DB、team/agent registry、role instruction は server 側に集約する。skill は指定 server に join する client。
 
 ## Install
 
@@ -18,7 +18,7 @@ Codex client へ通常 install:
 npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
 ```
 
-`--copy` を付ける。agmsg は local mode では skill dir 配下に `db/`, `teams/`, `db/config.yaml` を書くため、symlink/cache 依存にしない方が事故が少ない。
+`--copy` を付ける。skill は client scripts だけを入れる。runtime state は `~/.agmsg-hub/` に置く。
 
 Skills CLI 用の配布物は repo root ではなく `skills/agmsg/` に置いている。`npx skills add` では runtime skill files だけを入れ、`tests/`, `update-working-docs/`, clone-based installer helper は入れない。
 
@@ -62,16 +62,17 @@ server 側で `agmsgd` を起動中なら、必要に応じて止めて起動し
 
 ## Server 起動
 
-server machine にも同じ install をしておく:
+server machine では repo を clone する:
 
 ```bash
-npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
+git clone https://github.com/2bbb/agmsg-hub.git
+cd agmsg-hub
 ```
 
 server machine で:
 
 ```bash
-~/.agents/skills/agmsg/scripts/server.sh serve --host 0.0.0.0 --port 8787
+./server/server.sh serve --host 0.0.0.0 --port 8787
 ```
 
 同じ machine から確認:

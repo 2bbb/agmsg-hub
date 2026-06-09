@@ -9,10 +9,10 @@
 #
 # This file implements a small filesystem-based ownership protocol:
 #
-#   Lock file: $SKILL_DIR/run/actas.<team>__<agent>.session
+#   Lock file: <agmsg run dir>/actas.<team>__<agent>.session
 #   Content  : one line — the owner session_id.
 #
-# A session_id is alive iff some $SKILL_DIR/run/cc-instance.<pid> file
+# A session_id is alive iff some <agmsg run dir>/cc-instance.<pid> file
 # currently contains it AND that PID is alive. The same primitive used by
 # session-start.sh's orphan-watcher cleanup. Stale locks (owner is no
 # longer alive) are reclaimable.
@@ -21,12 +21,20 @@
 # guarantees the link target either appears or doesn't, even under
 # concurrent claim attempts.
 #
-# Required caller-set variable:
-#   SKILL_DIR — agmsg skill root.
+# Optional caller-set variable:
+#   RUN_DIR — runtime state directory. Defaults to <agmsg hub home>/run.
 
-: "${SKILL_DIR:?actas-lock.sh requires SKILL_DIR}"
-
-_actas_lock_dir() { printf '%s/run' "$SKILL_DIR"; }
+_actas_lock_dir() {
+  if [ -n "${RUN_DIR:-}" ]; then
+    printf '%s' "$RUN_DIR"
+    return
+  fi
+  if command -v agmsg_run_dir >/dev/null 2>&1; then
+    agmsg_run_dir
+    return
+  fi
+  printf '%s/.agmsg-hub/run' "$HOME"
+}
 
 # Encode a team or agent name into a filesystem-safe form. Anything outside
 # [A-Za-z0-9._-] is percent-encoded byte-by-byte (UTF-8 safe, reversible).

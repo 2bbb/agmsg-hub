@@ -11,6 +11,7 @@ setup() {
   export FAKE_HOME="$(mktemp -d)"
   export REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
   export SK="$FAKE_HOME/.agents/skills/agmsg"
+  export AGMSG_HUB_HOME="$FAKE_HOME/.agmsg-hub"
 }
 
 teardown() {
@@ -22,11 +23,12 @@ teardown() {
   [ -f "$SK/scripts/lib/storage.sh" ]
   [ -f "$SK/scripts/lib/codex-config.sh" ]
   [ -f "$SK/scripts/lib/remote-client.sh" ]
-  [ -d "$SK/teams" ]
+  [ ! -d "$SK/teams" ]
+  [ ! -d "$SK/db" ]
   [ -x "$SK/scripts/doctor.sh" ]
-  [ -x "$SK/scripts/server.sh" ]
   [ -x "$SK/scripts/remote.sh" ]
-  [ -x "$SK/scripts/agmsgd.mjs" ]
+  [ ! -e "$SK/scripts/server.sh" ]
+  [ ! -e "$SK/scripts/agmsgd.mjs" ]
   [ -x "$SK/scripts/role-instructions.sh" ]
   grep -q 'doctor.sh --porcelain codex "$(pwd)"' "$SK/SKILL.md"
   grep -q 'remote.sh status' "$SK/SKILL.md"
@@ -48,15 +50,14 @@ teardown() {
 @test "install: --update restores scripts/lib even if it went missing" {
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --cmd agmsg
   rm -rf "$SK/scripts/lib"
-  rm -rf "$SK/teams"
+  touch "$SK/scripts/server.sh" "$SK/scripts/agmsgd.mjs"
   HOME="$FAKE_HOME" bash "$REPO_ROOT/install.sh" --update
   [ -f "$SK/scripts/lib/storage.sh" ]
   [ -f "$SK/scripts/lib/codex-config.sh" ]
   [ -f "$SK/scripts/lib/remote-client.sh" ]
-  [ -d "$SK/teams" ]
-  [ -x "$SK/scripts/server.sh" ]
   [ -x "$SK/scripts/remote.sh" ]
-  [ -x "$SK/scripts/agmsgd.mjs" ]
+  [ ! -e "$SK/scripts/server.sh" ]
+  [ ! -e "$SK/scripts/agmsgd.mjs" ]
   [ -x "$SK/scripts/role-instructions.sh" ]
   run bash "$SK/scripts/send.sh" demo alice bob "after update"
   [ "$status" -eq 0 ]
@@ -89,17 +90,16 @@ teardown() {
   mkdir -p "$SK"
   cp -RL "$REPO_ROOT/skills/agmsg/." "$SK/"
 
-  [ -d "$SK/db" ]
-  [ -d "$SK/teams" ]
+  [ ! -d "$SK/db" ]
+  [ ! -d "$SK/teams" ]
   [ ! -d "$SK/tests" ]
   [ ! -d "$SK/update-working-docs" ]
   [ ! -f "$SK/install.sh" ]
   [ ! -f "$SK/setup.sh" ]
-  [ -f "$SK/db/.gitkeep" ]
-  [ -f "$SK/teams/.gitkeep" ]
   [ -x "$SK/scripts/doctor.sh" ]
   [ -x "$SK/scripts/remote.sh" ]
-  [ -x "$SK/scripts/agmsgd.mjs" ]
+  [ ! -e "$SK/scripts/server.sh" ]
+  [ ! -e "$SK/scripts/agmsgd.mjs" ]
   [ -x "$SK/scripts/role-instructions.sh" ]
   ! grep -q "__SKILL_NAME__" "$SK/SKILL.md"
   grep -q "~/.agents/skills/agmsg/scripts/whoami.sh" "$SK/SKILL.md"
@@ -107,8 +107,8 @@ teardown() {
 
   run env HOME="$FAKE_HOME" bash "$SK/scripts/remote.sh" configure http://127.0.0.1:8787
   [ "$status" -eq 0 ]
-  [ -f "$SK/db/config.yaml" ]
-  grep -q "url: http://127.0.0.1:8787" "$SK/db/config.yaml"
+  [ -f "$AGMSG_HUB_HOME/config.yaml" ]
+  grep -q "url: http://127.0.0.1:8787" "$AGMSG_HUB_HOME/config.yaml"
 
   run env HOME="$FAKE_HOME" bash "$SK/scripts/send.sh" demo alice bob "from skills cli copy"
   [ "$status" -eq 0 ]
@@ -203,12 +203,12 @@ teardown() {
 
   bash "$SK/scripts/watch.sh" "$sid" "$project" claude-code &
   local first=$!
-  wait_for_file_value "$SK/run/watch.$sid.pid" "$first"
+  wait_for_file_value "$AGMSG_HUB_HOME/run/watch.$sid.pid" "$first"
 
   bash "$SK/scripts/watch.sh" "$sid" "$project" claude-code &
   local second=$!
   # New pid wrote the pidfile.
-  wait_for_file_value "$SK/run/watch.$sid.pid" "$second"
+  wait_for_file_value "$AGMSG_HUB_HOME/run/watch.$sid.pid" "$second"
   # And the previous holder no longer owns the pidfile. Direct SIGTERM
   # behavior is covered in test_delivery; this regression guard is about
   # not losing track of the successor by clobbering/removing its pidfile.

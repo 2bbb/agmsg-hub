@@ -14,7 +14,7 @@ teardown() {
   run bash "$SCRIPTS/config.sh" show
   [ "$status" -eq 0 ]
   [[ "$output" =~ "check_interval" ]]
-  [ -f "$TEST_SKILL_DIR/db/config.yaml" ]
+  [ -f "$TEST_SKILL_DIR/config.yaml" ]
 }
 
 @test "config get: returns default value when no config" {

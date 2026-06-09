@@ -14,9 +14,9 @@ An agent is identified by `(name, team)`. Project path and agent type (claude-co
 
 ### Messages — SQLite
 
-`~/.agents/skills/<cmd>/db/messages.db`
+`~/.agmsg-hub/db/messages.db`
 
-- Path resolved by `scripts/lib/storage.sh` (`agmsg_db_path`); override the storage directory with `AGMSG_STORAGE_PATH` (env > built-in default). Scoped to the SQLite store only.
+- Path resolved by `scripts/lib/storage.sh` (`agmsg_db_path`); override the hub home with `AGMSG_HUB_HOME` or the storage directory with `AGMSG_STORAGE_PATH`.
 - WAL journal mode for concurrent access (multiple readers + 1 writer)
 - Schema:
   ```sql
@@ -34,7 +34,7 @@ An agent is identified by `(name, team)`. Project path and agent type (claude-co
 
 ### Team Config — JSON
 
-`~/.agents/skills/<cmd>/teams/<team>/config.json`
+`~/.agmsg-hub/teams/<team>/config.json`
 
 ```json
 {
@@ -50,7 +50,7 @@ Manipulated via sqlite3 JSON1 functions (no python3 dependency).
 
 ### User Config — YAML
 
-`~/.agents/skills/<cmd>/db/config.yaml`
+`~/.agmsg-hub/config.yaml`
 
 ```yaml
 # agmsg configuration

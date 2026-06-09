@@ -11,7 +11,7 @@ NEW_NAME="${3:?Missing new agent name}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/storage.sh"
-TEAMS_DIR="$SCRIPT_DIR/../teams"
+TEAMS_DIR="$(agmsg_teams_dir)"
 DB="$(agmsg_db_path)"
 TEAM_CONFIG="$TEAMS_DIR/$TEAM/config.json"
 

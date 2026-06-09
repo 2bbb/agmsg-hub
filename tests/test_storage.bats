@@ -12,7 +12,7 @@ teardown() {
 
 # --- agmsg_db_path() resolution ---
 
-@test "storage: default path resolves under the skill dir" {
+@test "storage: default path resolves under agmsg hub home" {
   source "$SCRIPTS/lib/storage.sh"
   unset AGMSG_STORAGE_PATH
   [ "$(agmsg_db_path)" = "$TEST_SKILL_DIR/db/messages.db" ]
@@ -61,7 +61,7 @@ teardown() {
   # A message addressed to alice lives only in the overridden store.
   AGMSG_STORAGE_PATH="$store" bash "$SCRIPTS/send.sh" testteam bob alice "via override store"
 
-  # Simulate a clean install whose default skill db dir never existed.
+  # Simulate a clean install whose default hub db dir never existed.
   rm -rf "$TEST_SKILL_DIR/db"
 
   # Stop-hook delivery must still succeed (exit 0) and surface the message —
@@ -71,7 +71,7 @@ teardown() {
   [[ "$output" =~ "via override store" ]]
 }
 
-@test "storage: default db is untouched when the override is set" {
+@test "storage: default hub db is untouched when the override is set" {
   # The default store was initialized in setup; writing through an override
   # must not add rows to it.
   export AGMSG_STORAGE_PATH="$BATS_TEST_TMPDIR/store"

@@ -36,7 +36,7 @@ if agmsg_using_remote_storage; then
   exit 0
 fi
 
-TEAMS_DIR="$SCRIPT_DIR/../teams"
+TEAMS_DIR="$(agmsg_teams_dir)"
 TEAM_CONFIG="$TEAMS_DIR/$TEAM/config.json"
 
 # --- Ensure team config exists ---

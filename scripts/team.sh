@@ -28,7 +28,7 @@ if agmsg_using_remote_storage; then
   exit 0
 fi
 
-CONFIG="$SCRIPT_DIR/../teams/$TEAM/config.json"
+CONFIG="$(agmsg_teams_dir)/$TEAM/config.json"
 
 if [ ! -f "$CONFIG" ]; then
   echo "Team not found: $TEAM"

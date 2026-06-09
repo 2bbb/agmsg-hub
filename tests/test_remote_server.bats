@@ -12,7 +12,7 @@ setup() {
   SERVER_URL="http://127.0.0.1:$SERVER_PORT"
   SERVER_LOG="$BATS_TEST_TMPDIR/agmsgd.log"
 
-  bash "$SCRIPTS/server.sh" serve --host 127.0.0.1 --port "$SERVER_PORT" --db "$SERVER_DB" >"$SERVER_LOG" 2>&1 &
+  bash "$BATS_TEST_DIRNAME/../server/server.sh" serve --host 127.0.0.1 --port "$SERVER_PORT" --db "$SERVER_DB" >"$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
 
   wait_for_http "$SERVER_URL/api/v1/health"

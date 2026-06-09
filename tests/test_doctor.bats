@@ -43,11 +43,10 @@ EOF
 
   run env AGMSG_CODEX_CONFIG="$cfg" bash "$SCRIPTS/doctor.sh" codex "$TEST_PROJECT"
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "Codex writable_roots covers db directory" ]]
-  [[ "$output" =~ "Codex writable_roots covers teams directory" ]]
+  [[ "$output" =~ "Codex writable_roots covers hub data directory" ]]
 }
 
-@test "doctor codex fails when writable_roots do not cover skill data" {
+@test "doctor codex fails when writable_roots do not cover hub data" {
   local cfg="$TEST_PROJECT/codex-config.toml"
   cat > "$cfg" <<EOF
 [sandbox_workspace_write]
@@ -56,7 +55,7 @@ EOF
 
   run env AGMSG_CODEX_CONFIG="$cfg" bash "$SCRIPTS/doctor.sh" codex "$TEST_PROJECT"
   [ "$status" -ne 0 ]
-  [[ "$output" =~ "does not cover db directory" ]]
+  [[ "$output" =~ "does not cover hub data directory" ]]
   [[ "$output" =~ "AGMSG-DIRECTIVE" ]]
 }
 
@@ -69,8 +68,8 @@ EOF
 
   run env AGMSG_CODEX_CONFIG="$cfg" bash "$SCRIPTS/doctor.sh" --porcelain codex "$TEST_PROJECT"
   [ "$status" -ne 0 ]
-  [[ "$output" =~ $'check\tcodex.writable_root.db\tfail\t' ]]
-  [[ "$output" =~ $'fix\tcodex.writable_root.db\tadd_codex_writable_root\t' ]]
+  [[ "$output" =~ $'check\tcodex.writable_root.hub_home\tfail\t' ]]
+  [[ "$output" =~ $'fix\tcodex.writable_root.hub_home\tadd_codex_writable_root\t' ]]
   [[ "$output" =~ $'summary\tfail\t' ]]
 }
 
@@ -83,8 +82,7 @@ EOF
 
   run env AGMSG_CODEX_CONFIG="$cfg" bash "$SCRIPTS/doctor.sh" --apply-fixes codex "$TEST_PROJECT"
   [ "$status" -eq 0 ]
-  grep -q "$TEST_SKILL_DIR/db" "$cfg"
-  grep -q "$TEST_SKILL_DIR/teams" "$cfg"
+  grep -q "$TEST_SKILL_DIR" "$cfg"
 }
 
 @test "doctor apply-fixes creates missing Codex config" {
@@ -93,8 +91,7 @@ EOF
   run env AGMSG_CODEX_CONFIG="$cfg" bash "$SCRIPTS/doctor.sh" --apply-fixes --porcelain codex "$TEST_PROJECT"
   [ "$status" -eq 0 ]
   [ -f "$cfg" ]
-  grep -q "$TEST_SKILL_DIR/db" "$cfg"
-  grep -q "$TEST_SKILL_DIR/teams" "$cfg"
+  grep -q "$TEST_SKILL_DIR" "$cfg"
   [[ "$output" =~ $'summary\tok\t0\t' ]]
 }
 

@@ -17,7 +17,8 @@ PROJECT_PATH="${1:?Usage: identities.sh <project_path> <agent_type>}"
 AGENT_TYPE="${2:?Missing agent_type}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEAMS_DIR="$SCRIPT_DIR/../teams"
+source "$SCRIPT_DIR/lib/storage.sh"
+TEAMS_DIR="$(agmsg_teams_dir)"
 
 [ -d "$TEAMS_DIR" ] || exit 0
 

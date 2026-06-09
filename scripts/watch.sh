@@ -38,7 +38,7 @@ source "$SCRIPT_DIR/lib/storage.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/actas-lock.sh"
 DB="$(agmsg_db_path)"
-RUN_DIR="$SKILL_DIR/run"
+RUN_DIR="$(agmsg_run_dir)"
 PIDFILE="$RUN_DIR/watch.$SESSION_ID.pid"
 
 # Resolve poll interval. Env var wins over config, default 5s.

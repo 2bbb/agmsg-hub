@@ -10,7 +10,8 @@ ACTION="${1:?Usage: config.sh get|set|show ...}"
 shift
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/../db/config.yaml"
+source "$SCRIPT_DIR/lib/storage.sh"
+CONFIG_FILE="$(agmsg_config_file)"
 
 # --- Helpers ---
 

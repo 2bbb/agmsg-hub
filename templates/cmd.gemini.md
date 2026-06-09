@@ -1,9 +1,22 @@
 ---
 name: __SKILL_NAME__
-description: Cross-agent messaging via local SQLite by default, with optional remote HTTP storage. Send messages between Claude Code, Codex, Gemini CLI, and other agents.
+description: Cross-agent messaging client for a shared agmsg-hub server. Send messages between Claude Code, Codex, Gemini CLI, and other agents.
 ---
 
 Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER directly read or edit config files, DB, or team data. There is NO register.sh — use join.sh to join a team.**
+
+## Server
+
+Before identity resolution, run `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status`.
+
+If storage is not `remote`, ask the user for the agmsg-hub server URL, then run:
+
+```bash
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh configure <server_url>
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch remote
+```
+
+The server is managed separately from the agmsg-hub repo with `./server/server.sh serve`.
 
 ## Identity
 

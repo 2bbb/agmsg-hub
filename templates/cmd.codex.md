@@ -1,18 +1,31 @@
 ---
 name: __SKILL_NAME__
-description: Cross-agent messaging via local SQLite by default, with optional remote HTTP storage. Send messages between Claude Code, Codex, Gemini CLI, and other agents.
+description: Cross-agent messaging client for a shared agmsg-hub server. Send messages between Claude Code, Codex, Gemini CLI, and other agents.
 ---
 
 Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER directly read or edit config files, DB, or team data. There is NO register.sh — use join.sh to join a team.**
 
 ## Codex app modes
 
-- Local mode expects Bash and sqlite3. On Windows, use WSL or Git Bash; native Windows shells are not supported yet.
-- Local and Worktree modes can use local SQLite storage if `db/` and `teams/` are writable.
-- Cloud mode cannot access this machine's local agmsg database. Use remote storage when Cloud needs shared agmsg state.
+- This skill is a client. It should join a configured agmsg-hub server; do not start a server from the skill.
+- Local SQLite is a developer fallback only. Normal operation should use remote storage.
+- Cloud mode cannot access this machine's local agmsg data. Use remote storage when Cloud needs shared agmsg state.
 - Codex supports `turn` and `off` delivery only. Never offer `monitor` or `both`.
-- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, or `history` fails in remote mode with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
+- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, `history`, or `join` fails with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
 - If setup fails, run `~/.agents/skills/__SKILL_NAME__/scripts/doctor.sh codex "$(pwd)"`. Use `--porcelain` for stable agent-readable diagnostics and `--apply-fixes` only when the user wants to add missing Codex `writable_roots`.
+
+## Server
+
+Before identity resolution, run `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status`.
+
+If storage is not `remote`, ask the user for the agmsg-hub server URL, then run:
+
+```bash
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh configure <server_url>
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch remote
+```
+
+The server is managed separately from the agmsg-hub repo with `./server/server.sh serve`.
 
 ## Identity
 

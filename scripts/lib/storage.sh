@@ -7,12 +7,23 @@
 #
 # Resolution order:
 #   1. AGMSG_STORAGE_PATH — directory that holds messages.db (env override)
-#   2. built-in default   — <skill>/db
+#   2. built-in default   — <agmsg hub home>/db
 #
-# [seam] A config-file layer is expected to slot in between the env override
-# and the built-in default once the storage-driver work lands; the intended
-# full order is env > config > default. Keep that logic here so call sites
-# stay unchanged.
+agmsg_home() {
+  if [ -n "${AGMSG_HUB_HOME:-}" ]; then
+    printf '%s\n' "${AGMSG_HUB_HOME%/}"
+    return
+  fi
+  printf '%s\n' "$HOME/.agmsg-hub"
+}
+
+agmsg_teams_dir() {
+  printf '%s/teams\n' "$(agmsg_home)"
+}
+
+agmsg_run_dir() {
+  printf '%s/run\n' "$(agmsg_home)"
+}
 
 # Echo the directory that holds (or will hold) the message store.
 agmsg_storage_dir() {
@@ -21,10 +32,7 @@ agmsg_storage_dir() {
     printf '%s\n' "${AGMSG_STORAGE_PATH%/}"
     return
   fi
-  local lib_dir skill_dir
-  lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  skill_dir="$(cd "$lib_dir/../.." && pwd)"
-  printf '%s\n' "$skill_dir/db"
+  printf '%s/db\n' "$(agmsg_home)"
 }
 
 # Echo the full path to messages.db.
@@ -33,10 +41,7 @@ agmsg_db_path() {
 }
 
 agmsg_config_file() {
-  local lib_dir skill_dir
-  lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  skill_dir="$(cd "$lib_dir/../.." && pwd)"
-  printf '%s/db/config.yaml\n' "$skill_dir"
+  printf '%s/config.yaml\n' "$(agmsg_home)"
 }
 
 agmsg_config_get() {

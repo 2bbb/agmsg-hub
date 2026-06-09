@@ -169,7 +169,7 @@ check_codex_writable_root() {
       fail "$id" "Codex writable_roots repair failed for $label: $path"
       return
     fi
-    warn "codex.config" "Codex config not found; Local mode may still work, but sandbox writable_roots cannot be checked"
+    warn "codex.config" "Codex config not found; sandbox writable_roots cannot be checked"
     return
   fi
 
@@ -215,6 +215,7 @@ esac
 if [ "$PORCELAIN" = false ]; then
   printf 'agmsg doctor\n'
   printf 'skill_dir: %s\n' "$SKILL_DIR"
+  printf 'hub_home: %s\n' "$(agmsg_home)"
   printf 'project: %s\n' "$PROJECT_PATH"
   printf 'agent_type: %s\n' "$AGENT_TYPE"
   if [ "$AGENT_TYPE" = "codex" ]; then
@@ -234,16 +235,15 @@ check_executable "$SCRIPT_DIR/join.sh" "join.sh" "script.join"
 check_executable "$SCRIPT_DIR/inbox.sh" "inbox.sh" "script.inbox"
 check_executable "$SCRIPT_DIR/send.sh" "send.sh" "script.send"
 check_executable "$SCRIPT_DIR/delivery.sh" "delivery.sh" "script.delivery"
-check_executable "$SCRIPT_DIR/server.sh" "server.sh" "script.server"
 check_executable "$SCRIPT_DIR/remote.sh" "remote.sh" "script.remote"
 check_executable "$SCRIPT_DIR/role-instructions.sh" "role-instructions.sh" "script.role_instructions"
 check_command sqlite3 sqlite3 "dependency.sqlite3"
-check_writable_dir "$SKILL_DIR/db" "db directory" "storage.db_dir"
-check_writable_dir "$SKILL_DIR/teams" "teams directory" "storage.teams_dir"
+check_writable_dir "$(agmsg_home)" "hub data directory" "storage.hub_home"
+check_writable_dir "$(agmsg_storage_dir)" "db directory" "storage.db_dir"
+check_writable_dir "$(agmsg_teams_dir)" "teams directory" "storage.teams_dir"
 
 if [ "$AGENT_TYPE" = "codex" ]; then
-  check_codex_writable_root "$SKILL_DIR/db" "db directory" "codex.writable_root.db"
-  check_codex_writable_root "$SKILL_DIR/teams" "teams directory" "codex.writable_root.teams"
+  check_codex_writable_root "$(agmsg_home)" "hub data directory" "codex.writable_root.hub_home"
 
   hooks_file="$PROJECT_PATH/.codex/hooks.json"
   check_json_file "$hooks_file" "Codex hooks file" "codex.hooks_json"

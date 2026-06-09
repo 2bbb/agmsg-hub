@@ -52,9 +52,10 @@ npx -y skills@latest add 2bbb/agmsg-hub --skill agmsg -g -a codex -y --copy
 ```
 
 Use `skills add`, not `skills install`; the Vercel Skills CLI does not expose an
-`install` command. `--copy` keeps the installed skill self-contained under
-`~/.agents/skills/agmsg/`, which is important because agmsg writes local config,
-DB, and team files there unless remote storage is enabled.
+`install` command. `--copy` keeps the installed client skill self-contained
+under `~/.agents/skills/agmsg/`. Runtime state lives outside the skill under
+`~/.agmsg-hub/`, and shared operation should point the skill at an agmsg-hub
+server.
 
 The Skills CLI package lives under `skills/agmsg/` so `npx skills add` installs
 only the runtime skill files, not repo-only tests, planning docs, or installer
@@ -218,7 +219,7 @@ Settings are per-project. Each `<project>/.claude/settings.local.json` gets exac
 /agmsg mode monitor
 ```
 
-The command updates `db/config.yaml`, rewrites the project's hook entries, and prints an `AGMSG-DIRECTIVE` that activates `monitor` in the current session — no agent restart needed.
+The command updates `~/.agmsg-hub/config.yaml`, rewrites the project's hook entries, and prints an `AGMSG-DIRECTIVE` that activates `monitor` in the current session — no agent restart needed.
 
 ## Usage
 
@@ -248,10 +249,9 @@ $agmsg wait [seconds] [poll]    — poll inbox for a short wait window
 
 Codex supports `mode turn` and `mode off` only — there's no Monitor tool to stream into.
 
-In the Codex app, Local and Worktree modes can use agmsg's local SQLite store
-when the installed skill's `db/` and `teams/` directories are writable by the
-sandbox. Cloud mode cannot use this machine's local SQLite file directly; use
-the optional remote server mode when Cloud needs shared storage.
+In the Codex app, Local, Worktree, and Cloud modes should use the configured
+agmsg-hub server for shared state. The installed skill is a client; it does not
+own the server or team database.
 
 When remote mode is active, Codex app/CLI may still block localhost or LAN HTTP
 from sandboxed shell commands. If `$agmsg doctor`, `$agmsg remote status`,
@@ -297,17 +297,19 @@ equivalent, so only `mode turn` and `mode off` are supported. Asking for
 
 `hook.sh on|off` still works as a legacy alias for `delivery.sh set turn|off` but prints a deprecation notice.
 
-## Remote Server MVP
+## Server
 
-Local SQLite remains the default. Remote mode is opt-in and currently covers
-the core message flow plus server-side team registry and role instructions:
-`join.sh`, `team.sh`, `whoami.sh`, `role-instructions.sh`, `send.sh`,
-`inbox.sh`, and `history.sh` over HTTP.
+The server is independent from the skill. Run one agmsg-hub server on the
+machine that should own shared state, then point every client skill at it.
+The server owns message storage, team/agent registration, role instructions,
+and the browser dashboard.
 
 Start a server on the machine that should own the shared SQLite store:
 
 ```bash
-~/.agents/skills/agmsg/scripts/server.sh serve --host 127.0.0.1 --port 8787
+git clone https://github.com/2bbb/agmsg-hub.git
+cd agmsg-hub
+./server/server.sh serve --host 127.0.0.1 --port 8787
 ```
 
 The same server also exposes a small browser dashboard at
@@ -315,7 +317,7 @@ The same server also exposes a small browser dashboard at
 sending test messages. Team members can be selected in the dashboard and their
 role instructions can be edited there.
 
-Configure a client and switch it to remote storage:
+Configure each client skill and switch it to the server:
 
 ```bash
 ~/.agents/skills/agmsg/scripts/remote.sh configure http://127.0.0.1:8787
@@ -361,17 +363,18 @@ git pull
 ./install.sh --update
 ```
 
-DB and team configs are preserved. Only scripts and assets are updated.
+Client config under `~/.agmsg-hub/config.yaml` is preserved. Only skill scripts
+and assets are updated.
 
 ## Uninstall
 
 ```bash
 ./uninstall.sh              # Interactive (confirms each step)
 ./uninstall.sh --yes        # Remove everything
-./uninstall.sh --keep-data  # Remove skill but keep DB and teams
+./uninstall.sh --keep-data  # Remove skill but keep ~/.agmsg-hub data
 ```
 
-Auto-detects installed skill directories and cleans up: skill files, slash commands, hooks, AGENTS.md sections, and team configs.
+Auto-detects installed skill directories and cleans up: skill files, slash commands, hooks, AGENTS.md sections, and optional hub data.
 
 ## Configuration
 
@@ -379,12 +382,13 @@ Auto-detects installed skill directories and cleans up: skill files, slash comma
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AGMSG_STORAGE_PATH` | `<skill>/db` | Directory holding the SQLite message store (`messages.db`). Override to relocate the store — handy for tests, sandboxes, or running isolated instances. |
+| `AGMSG_HUB_HOME` | `~/.agmsg-hub` | Directory for client config, local fallback data, and server data when running `server/server.sh`. |
+| `AGMSG_STORAGE_PATH` | `~/.agmsg-hub/db` | Directory holding the SQLite message store (`messages.db`). Override to relocate the store — handy for tests, sandboxes, or running isolated instances. |
 | `AGMSG_STORAGE_DRIVER` | `sqlite` | Set to `remote` to use the remote HTTP storage client without changing config. |
 | `AGMSG_REMOTE_URL` | unset | Remote agmsgd base URL used when storage driver is `remote`. |
 | `AGMSG_REMOTE_TOKEN` | unset | Bearer token for remote agmsgd when the server is started with `--token`. |
 
-The local message store path resolves as **`AGMSG_STORAGE_PATH` (env) > built-in default**. The override is scoped to the SQLite store only — team configs under `teams/` are unaffected.
+The local message store path resolves as **`AGMSG_STORAGE_PATH` (env) > `AGMSG_HUB_HOME/db`**. Team configs and runtime locks live under `AGMSG_HUB_HOME`.
 
 ```bash
 # Run against an isolated store
@@ -405,11 +409,17 @@ bats tests/    # requires bats-core: brew install bats-core
 ├── agents/
 │   └── openai.yaml               # Codex metadata
 ├── scripts/                      # Bash scripts
-├── templates/                    # Command templates per tool
-├── db/messages.db                # SQLite WAL-mode message store
-└── teams/                        # Team configs (self-contained)
-    └── <team>/
-        └── config.json
+└── templates/                    # Command templates per tool
+
+~/.agmsg-hub/
+├── config.yaml                   # Client/server config
+├── db/messages.db                # Local/server SQLite store
+├── teams/                        # Local fallback team configs
+└── run/                          # Watcher locks and runtime state
+
+agmsg-hub/server/
+├── server.sh                     # Server entry point
+└── agmsgd.mjs                    # HTTP API + browser UI
 ```
 
 - **Storage**: Single SQLite file with WAL mode

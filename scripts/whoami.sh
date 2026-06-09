@@ -87,7 +87,7 @@ if agmsg_using_remote_storage; then
   exit 0
 fi
 
-TEAMS_DIR="$SCRIPT_DIR/../teams"
+TEAMS_DIR="$(agmsg_teams_dir)"
 
 if [ ! -d "$TEAMS_DIR" ]; then
   echo "not_joined=true available_teams=none"

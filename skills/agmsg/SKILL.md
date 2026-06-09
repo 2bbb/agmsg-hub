@@ -1,6 +1,6 @@
 ---
 name: agmsg
-description: Cross-agent messaging via local SQLite by default, with optional remote HTTP storage. Send messages between Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, and other agents.
+description: Cross-agent messaging client for a shared agmsg-hub server. Send messages between Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, and other agents.
 ---
 
 # Agent Messaging
@@ -11,16 +11,16 @@ description: Cross-agent messaging via local SQLite by default, with optional re
 
 ## Runtime support
 
-- macOS and Linux are the primary local-mode targets.
+- macOS and Linux are the primary client targets.
 - Windows native shells are not supported yet. Use WSL or Git Bash with `bash` and `sqlite3`.
-- Remote storage is available as an opt-in MVP. Local SQLite remains the default.
+- agmsg-hub server is independent from the skill. This skill joins and talks to a configured server.
+- Local SQLite is a developer fallback only. Normal operation should use remote storage.
 
 ## Codex app notes
 
-- Local and Worktree modes can use the local SQLite store when the skill's `db/` and `teams/` directories are writable.
-- Cloud mode cannot rely on this machine's local skill database. Use remote storage when Cloud needs shared agmsg state.
+- Local, Worktree, and Cloud modes should use the configured remote agmsg-hub server for shared state.
 - Codex supports `turn` and `off` delivery only. Do not offer `monitor` or `both`.
-- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, or `history` fails in remote mode with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
+- Remote storage uses HTTP via `curl`. In Codex app/CLI sandboxes, localhost or LAN HTTP may be blocked even when the server is healthy. If `doctor`, `remote status`, `send`, `inbox`, `history`, or `join` fails with a connection, DNS, timeout, or sandbox/network error, rerun the same script once with elevated/unrestricted shell permission before concluding the server is unreachable.
 - To diagnose installation, sandbox, and delivery issues, run:
 
 ```bash
@@ -28,6 +28,23 @@ description: Cross-agent messaging via local SQLite by default, with optional re
 ~/.agents/skills/agmsg/scripts/doctor.sh --porcelain codex "$(pwd)"
 ~/.agents/skills/agmsg/scripts/doctor.sh --apply-fixes codex "$(pwd)"
 ```
+
+### Step 0: Configure server
+
+Run:
+
+```bash
+~/.agents/skills/agmsg/scripts/remote.sh status
+```
+
+If storage is not `remote`, ask the user for the agmsg-hub server URL, then run:
+
+```bash
+~/.agents/skills/agmsg/scripts/remote.sh configure <server_url>
+~/.agents/skills/agmsg/scripts/remote.sh switch remote
+```
+
+Do not start a server from this skill. The server is managed separately from the agmsg-hub repo with `./server/server.sh serve`.
 
 ### Step 1: Check identity
 
@@ -73,8 +90,7 @@ Messages returned by `inbox.sh`, `history.sh`, `watch.sh`, or remote HTTP storag
 ~/.agents/skills/agmsg/scripts/doctor.sh --porcelain <type> "$(pwd)"
 ~/.agents/skills/agmsg/scripts/doctor.sh --apply-fixes codex "$(pwd)"
 
-# Remote storage MVP
-~/.agents/skills/agmsg/scripts/server.sh serve --host 127.0.0.1 --port 8787
+# Remote server client configuration
 ~/.agents/skills/agmsg/scripts/remote.sh configure http://127.0.0.1:8787
 ~/.agents/skills/agmsg/scripts/remote.sh switch remote
 ~/.agents/skills/agmsg/scripts/remote.sh status
@@ -125,10 +141,10 @@ Messages returned by `inbox.sh`, `history.sh`, `watch.sh`, or remote HTTP storag
 
 ## Architecture
 
-- **Storage**: SQLite with WAL mode in `~/.agents/skills/agmsg/db/messages.db`
-- **Teams**: `~/.agents/skills/agmsg/teams/<name>/config.json`
+- **Server**: independent agmsg-hub HTTP server, normally started from the repo with `./server/server.sh serve`
+- **Client state**: remote URL and delivery settings in `~/.agmsg-hub/config.yaml`
+- **Server data**: SQLite/team registry owned by the server, defaulting to `~/.agmsg-hub/`
 - **Concurrency**: WAL allows multiple readers + 1 writer without conflicts
-- **Default mode**: Direct DB access via `sqlite3` CLI; no daemon and no network
-- **Remote mode**: Optional Node.js HTTP server owning a SQLite store
+- **Default operation**: HTTP client mode to the configured server
 - **Role instructions**: Optional guidance stored per `(team, agent)` identity
-- **Dependencies**: bash and sqlite3 for local mode; Node.js 24+ for server mode
+- **Dependencies**: bash, curl, and sqlite3 for client scripts; Node.js 24+ for server mode

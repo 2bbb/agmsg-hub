@@ -4,6 +4,19 @@ description: Agent messaging — check inbox, send messages, view history
 
 Agent messaging command. **IMPORTANT: Always use the provided scripts. NEVER directly read or edit config files, DB, or team data. There is NO register.sh — use join.sh to join a team.**
 
+## Server
+
+Before identity resolution, run `~/.agents/skills/__SKILL_NAME__/scripts/remote.sh status`.
+
+If storage is not `remote`, ask the user for the agmsg-hub server URL, then run:
+
+```bash
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh configure <server_url>
+~/.agents/skills/__SKILL_NAME__/scripts/remote.sh switch remote
+```
+
+The server is managed separately from the agmsg-hub repo with `./server/server.sh serve`.
+
 ## Identity
 
 If you already know your AGENT and TEAMS from a previous `/__SKILL_NAME__` call in this session, and you have already loaded the role instruction for that AGENT, skip to **Execute** below.

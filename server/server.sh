@@ -7,7 +7,8 @@ if [ "$ACTION" = "serve" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/lib/storage.sh"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$REPO_DIR/scripts/lib/storage.sh"
 
 case "$ACTION" in
   serve)

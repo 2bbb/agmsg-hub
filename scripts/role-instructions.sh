@@ -22,7 +22,7 @@ sql_escape() {
 
 local_config_path() {
   local team="$1"
-  printf '%s/../teams/%s/config.json\n' "$SCRIPT_DIR" "$team"
+  printf '%s/%s/config.json\n' "$(agmsg_teams_dir)" "$team"
 }
 
 read_body_arg() {

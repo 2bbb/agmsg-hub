@@ -33,7 +33,7 @@ SESSION_ID=$(printf '%s' "$INPUT" \
   | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
   | head -1)
 if [ -n "$SESSION_ID" ]; then
-  PIDFILE="$SKILL_DIR/run/watch.$SESSION_ID.pid"
+  PIDFILE="$(agmsg_run_dir)/watch.$SESSION_ID.pid"
   if [ -f "$PIDFILE" ]; then
     WATCH_PID=$(cat "$PIDFILE" 2>/dev/null || true)
     if [ -n "$WATCH_PID" ] && kill -0 "$WATCH_PID" 2>/dev/null; then
@@ -64,7 +64,7 @@ fi
 # lives in the skill's run dir — independent of AGMSG_STORAGE_PATH. Keeping it
 # out of the store means an overridden/sandboxed store still gets delivery even
 # when the default db dir doesn't exist.
-MARKER="$SKILL_DIR/run/.lastcheck-$AGENT"
+MARKER="$(agmsg_run_dir)/.lastcheck-$AGENT"
 
 if [ -f "$MARKER" ]; then
   if [ "$(uname)" = "Darwin" ]; then
@@ -93,7 +93,7 @@ ENDJSON
   fi
 fi
 
-mkdir -p "$SKILL_DIR/run"
+mkdir -p "$(agmsg_run_dir)"
 touch "$MARKER"
 
 # Check for unread messages and mark as read

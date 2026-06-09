@@ -21,7 +21,8 @@ PROJECT="${2:?Missing project_path}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-RUN_DIR="$SKILL_DIR/run"
+source "$SCRIPT_DIR/lib/storage.sh"
+RUN_DIR="$(agmsg_run_dir)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/actas-lock.sh"
 

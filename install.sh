@@ -12,7 +12,7 @@ set -euo pipefail
 # Options:
 #   --cmd <name>        Command & skill folder name (default: agmsg)
 #                       Claude Code: /<cmd>, Codex: $<cmd>
-#   --update            Update skill scripts only (preserve DB and teams);
+#   --update            Update skill client scripts only (preserve ~/.agmsg-hub data);
 #                       install with --cmd/default name if missing
 #
 # Joining a team is done separately per-project, either by:
@@ -90,7 +90,7 @@ fi
 if [ "$UPDATE_ONLY" = true ]; then
   SKILL_NAME="$(basename "$SKILL_DIR")"
   echo "  Updating $SKILL_NAME..."
-  mkdir -p "$SKILL_DIR"/{scripts,templates,db,teams,agents}
+  mkdir -p "$SKILL_DIR"/{scripts,templates,agents}
   if [ -z "$AGENT_TYPE" ]; then
     if grep -q "whoami.sh.*antigravity" "$SKILL_DIR/SKILL.md" 2>/dev/null; then
       AGENT_TYPE="antigravity"
@@ -109,6 +109,7 @@ if [ "$UPDATE_ONLY" = true ]; then
   sed "s/__SKILL_NAME__/$SKILL_NAME/g" "$SCRIPT_DIR/templates/$SKILL_TEMPLATE" > "$SKILL_DIR/SKILL.md"
   # Recursive copy so nested helper dirs (scripts/lib/) ship without enumerating files.
   cp -R "$SCRIPT_DIR/scripts/." "$SKILL_DIR/scripts/"
+  rm -f "$SKILL_DIR/scripts/server.sh" "$SKILL_DIR/scripts/agmsgd.mjs"
   for tmpl in "$SCRIPT_DIR/templates/"cmd.*.md; do
     sed "s/__SKILL_NAME__/$SKILL_NAME/g" "$tmpl" > "$SKILL_DIR/templates/$(basename "$tmpl")"
   done
@@ -128,9 +129,9 @@ if [ "$UPDATE_ONLY" = true ]; then
     sed "s/__SKILL_NAME__/$SKILL_NAME/g" "$SCRIPT_DIR/templates/cmd.copilot.md" > "$COPILOT_SKILL_DIR/SKILL.md"
   fi
   cp "$SCRIPT_DIR/openai.yaml" "$SKILL_DIR/agents/openai.yaml" 2>/dev/null || true
-  chmod +x "$SKILL_DIR/scripts/"*.sh "$SKILL_DIR/scripts/"*.mjs
-  echo "  + updated scripts, templates, and SKILL.md"
-  echo "  ~ DB and team configs preserved"
+  chmod +x "$SKILL_DIR/scripts/"*.sh
+  echo "  + updated client scripts, templates, and SKILL.md"
+  echo "  ~ agmsg data lives under \${AGMSG_HUB_HOME:-~/.agmsg-hub}"
   echo ""
   echo "  ! Restart any running agent sessions to pick up the updated scripts."
   echo "    In-flight watch.sh processes keep the old code until they restart."
@@ -155,7 +156,9 @@ SKILL_DIR="$AGENTS_DIR/skills/$CMD_NAME"
 
 # --- Install skill ---
 echo "  Installing to ~/.agents/skills/$CMD_NAME/ ..."
-mkdir -p "$SKILL_DIR"/{scripts,templates,db,teams,agents}
+mkdir -p "$SKILL_DIR"/{scripts,templates,agents}
+HUB_HOME="${AGMSG_HUB_HOME:-$HOME/.agmsg-hub}"
+mkdir -p "$HUB_HOME"/{db,teams,run}
 
 # SKILL.md is generated from the agent-specific command template.
 SKILL_TEMPLATE="cmd.codex.md"
@@ -167,6 +170,7 @@ fi
 sed "s/__SKILL_NAME__/$CMD_NAME/g" "$SCRIPT_DIR/templates/$SKILL_TEMPLATE" > "$SKILL_DIR/SKILL.md"
 # Recursive copy so nested helper dirs (scripts/lib/) ship without enumerating files.
 cp -R "$SCRIPT_DIR/scripts/." "$SKILL_DIR/scripts/"
+rm -f "$SKILL_DIR/scripts/server.sh" "$SKILL_DIR/scripts/agmsgd.mjs"
 
 # Replace placeholder in templates with actual skill name
 for tmpl in "$SCRIPT_DIR/templates/"cmd.*.md; do
@@ -174,20 +178,20 @@ for tmpl in "$SCRIPT_DIR/templates/"cmd.*.md; do
 done
 
 cp "$SCRIPT_DIR/openai.yaml" "$SKILL_DIR/agents/openai.yaml" 2>/dev/null || true
-chmod +x "$SKILL_DIR/scripts/"*.sh "$SKILL_DIR/scripts/"*.mjs
+chmod +x "$SKILL_DIR/scripts/"*.sh
 
 # Marker file for uninstall detection
 touch "$SKILL_DIR/.agmsg"
 
-# Initialize DB
-if [ ! -f "$SKILL_DIR/db/messages.db" ]; then
-  bash "$SKILL_DIR/scripts/init-db.sh"
+# Initialize data home DB
+if [ ! -f "$HUB_HOME/db/messages.db" ]; then
+  AGMSG_HUB_HOME="$HUB_HOME" bash "$SKILL_DIR/scripts/init-db.sh"
 fi
 
 # Initialize config
-if [ ! -f "$SKILL_DIR/db/config.yaml" ]; then
-  bash "$SKILL_DIR/scripts/config.sh" show >/dev/null
-  echo "  + created default config at db/config.yaml"
+if [ ! -f "$HUB_HOME/config.yaml" ]; then
+  AGMSG_HUB_HOME="$HUB_HOME" bash "$SKILL_DIR/scripts/config.sh" show >/dev/null
+  echo "  + created default config at $HUB_HOME/config.yaml"
 fi
 
 # --- Install Claude Code global command ---
@@ -212,7 +216,7 @@ fi
 # --- Configure Codex sandbox (if Codex is installed) ---
 CODEX_CONFIG="$HOME/.codex/config.toml"
 if [ -f "$CODEX_CONFIG" ]; then
-  WRITABLE_PATHS=("$SKILL_DIR/db" "$SKILL_DIR/teams")
+  WRITABLE_PATHS=("$HUB_HOME")
   missing=()
   for p in "${WRITABLE_PATHS[@]}"; do
     if ! grep -q "$p" "$CODEX_CONFIG" 2>/dev/null; then
@@ -250,7 +254,7 @@ if [ -f "$CODEX_CONFIG" ]; then
       # No section at all
       printf '\n[sandbox_workspace_write]\nwritable_roots = [%s]\n' "$entries" >> "$CODEX_CONFIG"
     fi
-    echo "  + added Codex writable_roots for db/ and teams/"
+    echo "  + added Codex writable_roots for agmsg hub data"
   fi
 fi
 

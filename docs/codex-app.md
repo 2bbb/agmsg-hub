@@ -1,20 +1,20 @@
 # Codex App Guide
 
-agmsg local mode is usable from the Codex app only when the installed skill can
-write its local data directories. The current supported local-mode targets are
-macOS and Linux. On Windows, use WSL or Git Bash with `bash` and `sqlite3`.
+agmsg in the Codex app is a client for a separately running agmsg-hub server.
+The installed skill should not own the server or shared team database. Client
+state lives under `~/.agmsg-hub/`.
 
-Remote storage is available as an opt-in MVP. Codex Cloud mode cannot use this
-machine's local agmsg database directly, but it can use an agmsgd server if the
-Cloud environment can reach the configured URL.
+Codex Cloud mode cannot use this machine's local agmsg database directly, but
+it can use an agmsgd server if the Cloud environment can reach the configured
+URL.
 
 ## Supported Modes
 
-| Codex app mode | agmsg local storage | Notes |
+| Codex app mode | agmsg storage | Notes |
 |---|---|---|
-| Local | supported | Requires writable `db/` and `teams/` under the installed skill. |
-| Worktree | supported | Same as Local; confirm writable roots for the installed skill path. |
-| Cloud | remote only | Requires a reachable agmsgd server; local SQLite files are not available. |
+| Local | remote server | Requires a configured, reachable agmsgd server. |
+| Worktree | remote server | Same as Local; project path is registered on the server. |
+| Cloud | remote server | Requires a reachable agmsgd server; local SQLite files are not available. |
 
 Codex supports `turn` and `off` delivery only. Do not use `monitor` or `both`.
 
@@ -53,7 +53,7 @@ message DBs, team configs, hooks, or delivery mode.
 
 Use this checklist before treating Codex app local support as working.
 
-### Local Mode
+### Local / Worktree Mode
 
 1. Install or update agmsg:
 
@@ -70,14 +70,16 @@ Use this checklist before treating Codex app local support as working.
 4. Run:
 
    ```text
+   $agmsg remote configure http://<server-host>:8787
+   $agmsg remote on
    $agmsg doctor
    ```
 
    Acceptance:
 
    - The command reports no failures.
-   - Warnings about remote storage are acceptable when using local mode.
-   - If writable-root failures appear, `$agmsg doctor fix` repairs only Codex writable roots.
+   - Remote health reports reachable.
+   - If writable-root failures appear, `$agmsg doctor fix` repairs only the `~/.agmsg-hub` writable root.
 
 5. Run:
 
@@ -99,7 +101,7 @@ Use this checklist before treating Codex app local support as working.
    - `$agmsg doctor` still reports no failures.
    - `$agmsg mode` reports `mode: turn`.
 
-7. Send and receive a local test message using another registered agent or shell:
+7. Send and receive a test message using another registered agent or shell:
 
    ```bash
    ~/.agents/skills/agmsg/scripts/send.sh <team> <from> <to> "hello from acceptance"
@@ -109,16 +111,6 @@ Use this checklist before treating Codex app local support as working.
 
    - `$agmsg` reads the message.
    - The message is marked read after inbox display.
-
-### Worktree Mode
-
-Repeat the Local mode checklist from a Codex app Worktree session.
-
-Acceptance:
-
-- `$agmsg doctor` reports writable access to the installed skill `db/` and `teams/`.
-- Joining a team records the worktree project path as a registration.
-- `turn` delivery works from the worktree project path.
 
 ### Cloud Mode
 
@@ -130,18 +122,15 @@ $agmsg doctor
 
 Acceptance:
 
-- The user is told local storage is not available from Cloud mode.
-- If remote storage is configured, `$agmsg remote status` reports
-  `remote.health=ok`.
+- `$agmsg remote status` reports `remote.health=ok` when the server is reachable.
 - If `remote.health` fails but Terminal `curl` succeeds, the workflow retries
   the same agmsg command with elevated/unrestricted shell permission before
   reporting the server as unreachable.
 - The workflow does not claim that local `~/.agents/skills/agmsg` data is
   available from Cloud mode.
 
-If the skill is not available in Cloud mode, that is still acceptable for the
-local-mode release path. The important point is that agmsg must not imply Cloud
-can use the user's local SQLite database.
+The important point is that agmsg must not imply Cloud can use the user's local
+SQLite database.
 
 ## Troubleshooting
 
@@ -155,4 +144,5 @@ If `doctor` reports invalid `.codex/hooks.json`, inspect the file before
 changing delivery mode again. The doctor command does not rewrite invalid hook
 JSON automatically.
 
-If `sqlite3` is missing, install it first. agmsg local mode depends on it.
+If `sqlite3` is missing, install it first. Some client helpers and local
+developer fallback paths depend on it.

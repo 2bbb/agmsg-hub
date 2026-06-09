@@ -4,6 +4,7 @@
 setup_test_env() {
   export TEST_SKILL_DIR="$(mktemp -d)"
   mkdir -p "$TEST_SKILL_DIR"/{scripts,db,teams}
+  export AGMSG_HUB_HOME="$TEST_SKILL_DIR"
 
   # Copy all scripts to isolated skill dir. Recursive so nested helper dirs
   # (scripts/lib/) come along without enumerating files.
