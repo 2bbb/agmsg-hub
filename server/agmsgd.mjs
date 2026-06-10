@@ -510,6 +510,20 @@ const WEB_UI_HTML = `<!doctype html>
       renderHistoryPager();
     }
 
+    function formatLocalTimestamp(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value || "";
+      return new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        timeZoneName: "short",
+      }).format(date);
+    }
+
     async function loadProjects(archived = false) {
       const previous = projectIdentity(state.selectedProject);
       const data = await api("/api/v1/projects" + (archived ? "?archived=1" : ""));
@@ -716,7 +730,7 @@ const WEB_UI_HTML = `<!doctype html>
           ? messageProjectLabel(message) + " · " + message.team + " · " + message.from_agent + " -> " + message.to_agent
           : message.from_agent + " -> " + message.to_agent;
         const time = document.createElement("span");
-        time.textContent = message.created_at + (message.read ? " read" : " unread");
+        time.textContent = formatLocalTimestamp(message.created_at) + (message.read ? " read" : " unread");
         const body = document.createElement("div");
         body.className = "message-body";
         body.textContent = message.body;
@@ -1418,7 +1432,7 @@ function handleHistory(url, res, db) {
       `).all(...params, limit, effectiveOffset);
 
   jsonResponse(res, 200, {
-    messages: rows.reverse().map(messageRow),
+    messages: rows.map(messageRow),
     total,
     limit,
     offset: effectiveOffset,

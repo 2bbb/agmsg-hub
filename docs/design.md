@@ -142,7 +142,7 @@ A marker file (`run/.lastcheck-<hash(team,agent,client_id)>`) tracks the last ch
 | `init-db.sh` | Create SQLite database with schema |
 | `send.sh` | Insert a message into the database |
 | `inbox.sh` | Show unread messages and mark as read |
-| `history.sh` | Show message history (newest first, displayed oldest first) |
+| `history.sh` | Show message history newest first, with timestamps displayed in local time |
 | `join.sh` | Add agent to team (create team if needed) |
 | `leave.sh` | Remove agent from team (delete team if empty) |
 | `team.sh` | List team members |

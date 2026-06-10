@@ -48,6 +48,20 @@ if [ -n "$PROJECT_PATH" ]; then
   PROJECT_ID="$(agmsg_project_key "$PROJECT_PATH")"
 fi
 
+format_local_time() {
+  local ts="$1"
+  if date -d "$ts" "+%Y-%m-%d %H:%M:%S %Z" 2>/dev/null; then
+    return
+  fi
+
+  local epoch
+  if epoch="$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" "+%s" 2>/dev/null)"; then
+    date -r "$epoch" "+%Y-%m-%d %H:%M:%S %Z" 2>/dev/null && return
+  fi
+
+  printf '%s\n' "$ts"
+}
+
 if agmsg_using_remote_storage; then
   source "$SCRIPT_DIR/lib/remote-client.sh"
   RESULT="$(agmsg_remote_history_rows "$TEAM" "$AGENT" "$LIMIT" "$PROJECT_PATH")"
@@ -58,7 +72,7 @@ if agmsg_using_remote_storage; then
   fi
 
   while IFS=$'\t' read -r from to body ts status; do
-    echo "  $status [$ts] $from → $to: $body"
+    echo "  $status [$(format_local_time "$ts")] $from → $to: $body"
   done <<< "$RESULT"
   exit 0
 fi
@@ -113,7 +127,7 @@ RESULT=$(sqlite3 "$DB" "
   LEFT JOIN message_reads mr
     ON mr.message_id = m.id
    AND mr.client_id = '$(printf '%s' "$CLIENT_ID" | sed "s/'/''/g")'
-  $WHERE ORDER BY m.created_at DESC LIMIT $LIMIT;
+  $WHERE ORDER BY m.created_at DESC, m.id DESC LIMIT $LIMIT;
 ")
 
 if [ -z "$RESULT" ]; then
@@ -121,8 +135,6 @@ if [ -z "$RESULT" ]; then
   exit 0
 fi
 
-# Reverse order (oldest first) and display
-REVERSED=$(echo "$RESULT" | tail -r 2>/dev/null || echo "$RESULT" | tac 2>/dev/null || echo "$RESULT" | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}')
 while IFS=$'\x1f' read -r from to body ts status; do
-  echo "  $status [$ts] $from → $to: $body"
-done <<< "$REVERSED"
+  echo "  $status [$(format_local_time "$ts")] $from → $to: $body"
+done <<< "$RESULT"

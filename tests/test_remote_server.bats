@@ -222,7 +222,7 @@ wait_for_http() {
     const data = JSON.parse(process.env.JSON);
     if (data.total !== 5 || data.limit !== 2 || data.offset !== 0 || data.has_prev !== false || data.has_next !== true) process.exit(1);
     const bodies = data.messages.map((message) => message.body);
-    if (bodies.join("|") !== "page message 4|page message 5") process.exit(1);
+    if (bodies.join("|") !== "page message 5|page message 4") process.exit(1);
   '
 
   run curl -fsS -G "$SERVER_URL/api/v1/messages/history" \
@@ -234,7 +234,7 @@ wait_for_http() {
     const data = JSON.parse(process.env.JSON);
     if (data.total !== 5 || data.limit !== 2 || data.offset !== 2 || data.has_prev !== true || data.has_next !== true) process.exit(1);
     const bodies = data.messages.map((message) => message.body);
-    if (bodies.join("|") !== "page message 2|page message 3") process.exit(1);
+    if (bodies.join("|") !== "page message 3|page message 2") process.exit(1);
   '
 }
 

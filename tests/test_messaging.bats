@@ -179,6 +179,21 @@ line"
   [ "$count" -eq 1 ]
 }
 
+@test "history: shows newest messages first" {
+  bash "$SCRIPTS/send.sh" testteam alice bob "oldest"
+  bash "$SCRIPTS/send.sh" testteam alice bob "middle"
+  bash "$SCRIPTS/send.sh" testteam alice bob "newest"
+
+  run bash "$SCRIPTS/history.sh" testteam
+  [ "$status" -eq 0 ]
+  local newest_line middle_line oldest_line
+  newest_line=$(printf '%s\n' "$output" | grep -n "newest" | cut -d: -f1)
+  middle_line=$(printf '%s\n' "$output" | grep -n "middle" | cut -d: -f1)
+  oldest_line=$(printf '%s\n' "$output" | grep -n "oldest" | cut -d: -f1)
+  [ "$newest_line" -lt "$middle_line" ]
+  [ "$middle_line" -lt "$oldest_line" ]
+}
+
 @test "history: shows no history message when empty" {
   run bash "$SCRIPTS/history.sh" testteam
   [ "$status" -eq 0 ]

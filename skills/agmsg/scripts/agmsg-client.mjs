@@ -462,6 +462,20 @@ function sleep(ms) {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 }
 
+function formatLocalTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || '';
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  }).format(date);
+}
+
 async function cmdInbox(args) {
   requireRemoteSelected();
   const quiet = args.includes('--quiet');
@@ -527,7 +541,7 @@ async function cmdHistory(args) {
     return;
   }
   for (const message of messages) {
-    console.log(`  ${message.read ? '○' : '●'} [${message.created_at}] ${message.from_agent} → ${message.to_agent}: ${message.body}`);
+    console.log(`  ${message.read ? '○' : '●'} [${formatLocalTimestamp(message.created_at)}] ${message.from_agent} → ${message.to_agent}: ${message.body}`);
   }
 }
 
