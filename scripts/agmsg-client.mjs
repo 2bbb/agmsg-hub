@@ -195,12 +195,20 @@ function gitOutput(args, cwd) {
   }
 }
 
+function normalizeProjectKey(value) {
+  if (!value) return value;
+  const text = String(value);
+  if (!text.startsWith('git:')) return text;
+  const remote = text.slice(4).replace(/[\\/]+$/, '').replace(/\.git$/i, '');
+  return `git:${remote}`;
+}
+
 function projectKey(projectPath) {
-  if (process.env.AGMSG_PROJECT_KEY) return process.env.AGMSG_PROJECT_KEY;
+  if (process.env.AGMSG_PROJECT_KEY) return normalizeProjectKey(process.env.AGMSG_PROJECT_KEY);
   const root = gitOutput(['rev-parse', '--show-toplevel'], projectPath);
   if (root) {
     const remote = gitOutput(['config', '--get', 'remote.origin.url'], root);
-    if (remote) return `git:${remote}`;
+    if (remote) return normalizeProjectKey(`git:${remote}`);
     return `git-local:${hash(realPath(root))}`;
   }
   return `local:${clientId()}:${hash(realPath(projectPath))}`;

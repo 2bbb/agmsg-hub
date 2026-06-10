@@ -96,6 +96,62 @@ wait_for_http() {
   EXTRA_SERVER_PID=""
 }
 
+@test "server: canonicalizes stored git project keys on startup" {
+  local db="$BATS_TEST_TMPDIR/canonical/messages.db"
+  local port url log pid
+  mkdir -p "$(dirname "$db")"
+  sqlite3 "$db" "
+    CREATE TABLE teams (
+      name TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+    CREATE TABLE registrations (
+      team TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      agent_type TEXT NOT NULL,
+      project_path TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      client_label TEXT NOT NULL DEFAULT '',
+      hostname TEXT,
+      project_key TEXT,
+      archived_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      PRIMARY KEY (team, agent, agent_type, client_id, project_path)
+    );
+    INSERT INTO teams (name) VALUES ('splitteam');
+    INSERT INTO registrations (team, agent, agent_type, project_path, client_id, client_label, project_key)
+    VALUES
+      ('splitteam', 'mac', 'codex', '/tmp/mac', 'client-a', 'mac', 'git:git@github.com:acme/example.git'),
+      ('splitteam', 'win', 'codex', 'C:\\Users\\me\\example', 'client-b', 'win', 'git:git@github.com:acme/example');
+  "
+
+  port="$(node -e "const net=require('node:net'); const s=net.createServer(); s.listen(0, '127.0.0.1', () => { console.log(s.address().port); s.close(); });")"
+  url="http://127.0.0.1:$port"
+  log="$BATS_TEST_TMPDIR/agmsgd-canonical.log"
+
+  bash "$BATS_TEST_DIRNAME/../server/server.sh" serve --host 127.0.0.1 --port "$port" --db "$db" >"$log" 2>&1 &
+  pid=$!
+  EXTRA_SERVER_PID="$pid"
+  wait_for_http "$url/api/v1/health" || {
+    cat "$log" >&2 || true
+    return 1
+  }
+
+  run curl -fsS "$url/api/v1/projects"
+  [ "$status" -eq 0 ]
+  JSON="$output" node -e '
+    const data = JSON.parse(process.env.JSON);
+    const projects = data.projects.filter((project) => project.team === "splitteam");
+    if (projects.length !== 1) process.exit(1);
+    if (projects[0].project_id !== "git:git@github.com:acme/example") process.exit(1);
+    if (projects[0].roles !== 2) process.exit(1);
+  '
+
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  EXTRA_SERVER_PID=""
+}
+
 @test "server: root serves browser dashboard" {
   run curl -fsS "$SERVER_URL/"
   [ "$status" -eq 0 ]
@@ -179,6 +235,30 @@ wait_for_http() {
     if (data.total !== 5 || data.limit !== 2 || data.offset !== 2 || data.has_prev !== true || data.has_next !== true) process.exit(1);
     const bodies = data.messages.map((message) => message.body);
     if (bodies.join("|") !== "page message 2|page message 3") process.exit(1);
+  '
+}
+
+@test "remote storage: git project keys ignore trailing dotgit" {
+  run curl -fsS -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"team":"dotgit","agent":"mac","type":"codex","project":"/tmp/dotgit-mac","client_id":"client-a","project_key":"git:git@github.com:acme/example.git"}' \
+    "$SERVER_URL/api/v1/teams/join"
+  [ "$status" -eq 0 ]
+
+  run curl -fsS -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"team":"dotgit","agent":"win","type":"codex","project":"C:\\Users\\me\\example","client_id":"client-b","project_key":"git:git@github.com:acme/example"}' \
+    "$SERVER_URL/api/v1/teams/join"
+  [ "$status" -eq 0 ]
+
+  run curl -fsS "$SERVER_URL/api/v1/projects"
+  [ "$status" -eq 0 ]
+  JSON="$output" node -e '
+    const data = JSON.parse(process.env.JSON);
+    const projects = data.projects.filter((project) => project.team === "dotgit");
+    if (projects.length !== 1) process.exit(1);
+    if (projects[0].project_id !== "git:git@github.com:acme/example") process.exit(1);
+    if (projects[0].roles !== 2) process.exit(1);
   '
 }
 

@@ -64,10 +64,29 @@ agmsg_realpath() {
   printf '%s\n' "$path"
 }
 
+agmsg_normalize_project_key() {
+  local key="$1"
+  case "$key" in
+    git:*)
+      local remote="${key#git:}"
+      while [ "${remote%/}" != "$remote" ]; do
+        remote="${remote%/}"
+      done
+      case "$remote" in
+        *.git) remote="${remote%.git}" ;;
+      esac
+      printf 'git:%s\n' "$remote"
+      ;;
+    *)
+      printf '%s\n' "$key"
+      ;;
+  esac
+}
+
 agmsg_project_key() {
   local project_path="$1"
   if [ -n "${AGMSG_PROJECT_KEY:-}" ]; then
-    printf '%s\n' "$AGMSG_PROJECT_KEY"
+    agmsg_normalize_project_key "$AGMSG_PROJECT_KEY"
     return
   fi
 
@@ -75,7 +94,7 @@ agmsg_project_key() {
   if git_root="$(git -C "$project_path" rev-parse --show-toplevel 2>/dev/null)"; then
     remote="$(git -C "$git_root" config --get remote.origin.url 2>/dev/null || true)"
     if [ -n "$remote" ]; then
-      printf 'git:%s\n' "$remote"
+      agmsg_normalize_project_key "git:$remote"
       return
     fi
     printf 'git-local:%s\n' "$(agmsg_hash_string "$(agmsg_realpath "$git_root")")"

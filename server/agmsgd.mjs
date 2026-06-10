@@ -944,6 +944,7 @@ function initDb(path) {
   `);
   ensureMessagesProjectColumns(db);
   ensureRegistrationsTable(db);
+  canonicalizeStoredProjectKeys(db);
   return db;
 }
 
@@ -1047,6 +1048,37 @@ function ensureRegistrationsTable(db) {
       null,
       row.created_at || new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     );
+  }
+}
+
+function canonicalProjectKey(value) {
+  if (!value) {
+    return null;
+  }
+  const text = String(value);
+  if (!text.startsWith('git:')) {
+    return text;
+  }
+  const remote = text.slice(4).replace(/[\\/]+$/, '').replace(/\.git$/i, '');
+  return `git:${remote}`;
+}
+
+function canonicalizeStoredProjectKeys(db) {
+  const updateRegistration = db.prepare('UPDATE registrations SET project_key = ? WHERE rowid = ?');
+  for (const row of db.prepare("SELECT rowid, project_key FROM registrations WHERE project_key LIKE 'git:%'").all()) {
+    const canonical = canonicalProjectKey(row.project_key);
+    if (canonical !== row.project_key) {
+      updateRegistration.run(canonical, row.rowid);
+    }
+  }
+
+  const updateMessage = db.prepare('UPDATE messages SET project_id = ?, project_key = ? WHERE rowid = ?');
+  for (const row of db.prepare("SELECT rowid, project_id, project_key FROM messages WHERE project_id LIKE 'git:%' OR project_key LIKE 'git:%'").all()) {
+    const projectId = canonicalProjectKey(row.project_id);
+    const projectKey = canonicalProjectKey(row.project_key);
+    if (projectId !== row.project_id || projectKey !== row.project_key) {
+      updateMessage.run(projectId, projectKey, row.rowid);
+    }
   }
 }
 
@@ -1228,8 +1260,8 @@ async function handleSend(req, res, db) {
     return;
   }
 
-  const projectId = payload.project_id || payload.project_key || null;
-  const projectKey = payload.project_key || null;
+  const projectId = canonicalProjectKey(payload.project_id || payload.project_key) || null;
+  const projectKey = canonicalProjectKey(payload.project_key) || null;
   const projectPath = payload.project_path || null;
   const fromClientId = payload.from_client_id || null;
 
@@ -1246,7 +1278,7 @@ function handleUnread(url, res, db) {
   const team = url.searchParams.get('team') || '';
   const agent = url.searchParams.get('agent') || '';
   const clientId = url.searchParams.get('client_id') || '';
-  const projectId = url.searchParams.get('project_id') || '';
+  const projectId = canonicalProjectKey(url.searchParams.get('project_id') || '') || '';
   const limit = intParam(url.searchParams.get('limit'), 100);
   if (!team || !agent || !clientId) {
     errorResponse(res, 400, 'missing_field', 'team, agent, and client_id are required');
@@ -1336,7 +1368,7 @@ function handleHistory(url, res, db) {
   const team = url.searchParams.get('team') || '';
   const agent = url.searchParams.get('agent') || '';
   const clientId = url.searchParams.get('client_id') || '';
-  const projectId = url.searchParams.get('project_id') || '';
+  const projectId = canonicalProjectKey(url.searchParams.get('project_id') || '') || '';
   const limit = intParam(url.searchParams.get('limit'), 20);
   const offset = offsetParam(url.searchParams.get('offset'));
 
@@ -1409,7 +1441,7 @@ async function handleJoin(req, res, db) {
   const clientId = payload.client_id || '';
   const clientLabel = payload.client_label || clientId;
   const hostname = payload.hostname || null;
-  const projectKey = payload.project_key || null;
+  const projectKey = canonicalProjectKey(payload.project_key) || null;
   if (!team || !agent || !agentType || !project || !clientId) {
     errorResponse(res, 400, 'missing_field', 'team, agent, type, project, and client_id are required');
     return;
@@ -1500,7 +1532,7 @@ async function handleProjectArchive(req, res, db) {
   }
 
   const team = payload.team || '';
-  const projectId = payload.project_id || '';
+  const projectId = canonicalProjectKey(payload.project_id || '') || '';
   const archived = Boolean(payload.archived);
   if (!team || !projectId) {
     errorResponse(res, 400, 'missing_field', 'team and project_id are required');
