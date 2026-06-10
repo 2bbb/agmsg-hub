@@ -136,6 +136,19 @@ teardown() {
   [[ "$output" =~ "Review as Alice." ]]
 }
 
+@test "skills package ships real scripts directory, not a symlink" {
+  [ -d "$REPO_ROOT/skills/agmsg/scripts" ]
+  [ ! -L "$REPO_ROOT/skills/agmsg/scripts" ]
+  [ -f "$REPO_ROOT/skills/agmsg/scripts/agmsg.ps1" ]
+  [ -f "$REPO_ROOT/skills/agmsg/scripts/agmsg-client.mjs" ]
+
+  while IFS= read -r script_path; do
+    rel="${script_path#"$REPO_ROOT/scripts/"}"
+    [ -f "$REPO_ROOT/skills/agmsg/scripts/$rel" ]
+    cmp "$script_path" "$REPO_ROOT/skills/agmsg/scripts/$rel"
+  done < <(find "$REPO_ROOT/scripts" -type f | sort)
+}
+
 # Regression: actas-claim.sh used to source lib/actas-lock.sh without first
 # setting SKILL_DIR, which made `: "${SKILL_DIR:?...}"` fire and the script
 # die in any fresh-shell invocation. bats tests passed because test_helper

@@ -44,6 +44,19 @@ directly:
 node "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg-client.mjs" remote status
 ```
 
+If PowerShell says `agmsg.ps1 is not recognized as the name of a cmdlet`, first
+check:
+
+```powershell
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+Test-Path $agmsg
+& $agmsg remote status
+```
+
+`Test-Path` must return `True`. If it returns `False`, update or reinstall the
+skill. If it returns `True`, use the PowerShell call operator `&`; a path stored
+in a variable is not executed by writing `$agmsg remote status`.
+
 ## Codex app notes
 
 - Local, Worktree, and Cloud modes should use the configured remote agmsg-hub server for shared state.

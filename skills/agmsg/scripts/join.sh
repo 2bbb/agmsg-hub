@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: join.sh <team> <agent_id> <type> <project_path>
+#
+# Adds an agent to a team. Creates the team if it doesn't exist.
+
+TEAM="${1:?Usage: join.sh <team> <agent_id> <type> <project_path>}"
+AGENT_ID="${2:?Missing agent_id}"
+AGENT_TYPE="${3:?Missing type (claude-code | codex)}"
+PROJECT_PATH="${4:?Missing project_path}"
+
+# Reject unknown agent types — the rest of agmsg (delivery.sh,
+# session-start.sh, identities.sh lookups) only supports the values listed
+# here. Allowing arbitrary strings silently mis-registers an agent and
+# makes monitor mode fail with a confusing "no joined teams" message.
+case "$AGENT_TYPE" in
+  claude-code|codex|gemini|antigravity|copilot) ;;
+  *) echo "Unknown agent type: '$AGENT_TYPE' (supported: claude-code, codex, gemini, antigravity, copilot)" >&2; exit 1 ;;
+esac
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/storage.sh"
+source "$SCRIPT_DIR/lib/client.sh"
+
+if agmsg_using_remote_storage; then
+  source "$SCRIPT_DIR/lib/remote-client.sh"
+  RESPONSE="$(agmsg_remote_join "$TEAM" "$AGENT_ID" "$AGENT_TYPE" "$PROJECT_PATH")"
+  TMP_RESPONSE="$(mktemp)"
+  printf '%s' "$RESPONSE" > "$TMP_RESPONSE"
+  CREATED_TEAM="$(sqlite3 :memory: "SELECT json_extract(readfile('$(printf '%s' "$TMP_RESPONSE" | sed "s/'/''/g")'), '$.created_team');" 2>/dev/null || echo 0)"
+  rm -f "$TMP_RESPONSE"
+  if [ "$CREATED_TEAM" = "1" ]; then
+    echo "Created team: $TEAM"
+  fi
+  echo "Joined team $TEAM as $AGENT_ID"
+  exit 0
+fi
+
+TEAMS_DIR="$(agmsg_teams_dir)"
+TEAM_CONFIG="$TEAMS_DIR/$TEAM/config.json"
+
+# --- Ensure team config exists ---
+mkdir -p "$TEAMS_DIR/$TEAM"
+if [ ! -f "$TEAM_CONFIG" ]; then
+  cat > "$TEAM_CONFIG" <<EOF
+{
+  "name": "$TEAM",
+  "agents": {},
+  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+  echo "Created team: $TEAM"
+fi
+
+# --- Add or extend agent registrations ---
+CONFIG_ESCAPED=$(sed "s/'/''/g" "$TEAM_CONFIG")
+CLIENT_ID="$(agmsg_client_id)"
+CLIENT_LABEL="$(agmsg_client_label)"
+HOSTNAME_VALUE="$(agmsg_hostname)"
+PROJECT_KEY="$(agmsg_project_key "$PROJECT_PATH")"
+REGISTRATION=$(sqlite3 :memory: "SELECT json_object(
+  'type', '$(printf '%s' "$AGENT_TYPE" | sed "s/'/''/g")',
+  'project', '$(printf '%s' "$PROJECT_PATH" | sed "s/'/''/g")',
+  'client_id', '$(printf '%s' "$CLIENT_ID" | sed "s/'/''/g")',
+  'client_label', '$(printf '%s' "$CLIENT_LABEL" | sed "s/'/''/g")',
+  'hostname', '$(printf '%s' "$HOSTNAME_VALUE" | sed "s/'/''/g")',
+  'project_key', '$(printf '%s' "$PROJECT_KEY" | sed "s/'/''/g")'
+);")
+REGISTRATION_ESCAPED=$(printf '%s' "$REGISTRATION" | sed "s/'/''/g")
+
+EXISTING=$(sqlite3 :memory: ".param set :json '$CONFIG_ESCAPED'" \
+  "SELECT json_extract(:json, '$.agents.$AGENT_ID');")
+
+if [ -z "$EXISTING" ] || [ "$EXISTING" = "null" ]; then
+  AGENT_OBJ="{\"registrations\":[${REGISTRATION}]}"
+else
+  EXISTING_ESCAPED=$(printf '%s' "$EXISTING" | sed "s/'/''/g")
+  NORMALIZED=$(sqlite3 :memory: "
+    WITH agent(a) AS (SELECT '$EXISTING_ESCAPED')
+    SELECT CASE
+      WHEN json_type(json_extract(a, '\$.registrations')) = 'array' THEN a
+      ELSE json_object(
+        'registrations',
+        json_array(json_object(
+          'type', json_extract(a, '\$.type'),
+          'project', json_extract(a, '\$.project')
+        ))
+      )
+    END
+    FROM agent;
+  ")
+  NORMALIZED_ESCAPED=$(printf '%s' "$NORMALIZED" | sed "s/'/''/g")
+
+  HAS_REGISTRATION=$(sqlite3 :memory: "
+    SELECT EXISTS(
+      SELECT 1
+      FROM json_each(json_extract('$NORMALIZED_ESCAPED', '\$.registrations'))
+      WHERE json_extract(value, '\$.type') = '$AGENT_TYPE'
+        AND json_extract(value, '\$.project') = '$PROJECT_PATH'
+        AND COALESCE(json_extract(value, '\$.client_id'), '$CLIENT_ID') = '$CLIENT_ID'
+    );
+  ")
+
+  if [ "$HAS_REGISTRATION" = "1" ]; then
+    AGENT_OBJ="$NORMALIZED"
+  else
+    AGENT_OBJ=$(sqlite3 :memory: "
+      SELECT json_set(
+        '$NORMALIZED_ESCAPED',
+        '\$.registrations[' || json_array_length(json_extract('$NORMALIZED_ESCAPED', '\$.registrations')) || ']',
+        json('$REGISTRATION_ESCAPED')
+      );
+    ")
+  fi
+fi
+
+UPDATED=$(sqlite3 :memory: \
+  ".param set :json '$CONFIG_ESCAPED'" \
+  "SELECT json_set(:json, '$.agents.$AGENT_ID', json('$(printf '%s' "$AGENT_OBJ" | sed "s/'/''/g")'));")
+echo "$UPDATED" > "$TEAM_CONFIG"
+
+echo "Joined team $TEAM as $AGENT_ID"

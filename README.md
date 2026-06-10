@@ -365,6 +365,20 @@ directly:
 node "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg-client.mjs" remote status
 ```
 
+If PowerShell says `agmsg.ps1 is not recognized as the name of a cmdlet`,
+check both of these:
+
+```powershell
+$agmsg = "$env:USERPROFILE\.agents\skills\agmsg\scripts\agmsg.ps1"
+Test-Path $agmsg
+& $agmsg remote status
+```
+
+`Test-Path` must return `True`. If it returns `False`, update/reinstall the
+skill because older packages used a symlinked `scripts` directory that Windows
+installers may not expand. If it returns `True`, the missing piece was probably
+the PowerShell call operator: use `& $agmsg ...`, not `$agmsg ...`.
+
 ## Server
 
 The server is independent from the skill. Run one agmsg-hub server on the
