@@ -167,6 +167,7 @@ wait_for_http() {
   [[ "$output" =~ 'id="history-limit"' ]]
   [[ "$output" =~ 'id="history-prev"' ]]
   [[ "$output" =~ 'id="history-next"' ]]
+  [[ "$output" =~ "Legacy unassigned messages" ]]
   [[ "$output" =~ "Send" ]]
   [[ "$output" =~ "Actas" ]]
   [[ "$output" =~ "Clients" ]]
@@ -183,6 +184,10 @@ wait_for_http() {
 }
 
 @test "remote storage: env-selected send, inbox, read, and history roundtrip" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/roundtrip-project
+  [ "$status" -eq 0 ]
+
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
     bash "$SCRIPTS/send.sh" testteam alice bob "hello remote"
   [ "$status" -eq 0 ]
@@ -204,9 +209,18 @@ wait_for_http() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "alice → bob: hello remote" ]]
   [[ "$output" =~ "○" ]]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/history.sh" testteam "" 20 --project /tmp/roundtrip-project
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "alice → bob: hello remote" ]]
 }
 
 @test "remote storage: history supports limit and offset pagination" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/pagination-project
+  [ "$status" -eq 0 ]
+
   for n in 1 2 3 4 5; do
     run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
       bash "$SCRIPTS/send.sh" testteam alice bob "page message $n"
@@ -311,6 +325,10 @@ wait_for_http() {
 
 @test "remote storage: read receipts are scoped to client id" {
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/read-receipts-project
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
     bash "$SCRIPTS/send.sh" testteam alice bob "remote per-client"
   [ "$status" -eq 0 ]
 
@@ -346,6 +364,9 @@ wait_for_http() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "storage.active=remote" ]]
   [[ "$output" =~ "remote.health=ok" ]]
+
+  run bash "$SCRIPTS/join.sh" testteam alice codex /tmp/configured-remote-project
+  [ "$status" -eq 0 ]
 
   run bash "$SCRIPTS/send.sh" testteam alice bob "configured remote"
   [ "$status" -eq 0 ]
@@ -468,6 +489,10 @@ wait_for_http() {
 }
 
 @test "remote storage: inbox --wait receives a later message" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/wait-project
+  [ "$status" -eq 0 ]
+
   (
     sleep 1
     AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
@@ -484,6 +509,14 @@ wait_for_http() {
 }
 
 @test "remote storage: project metadata scopes unread and history" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/remote-project-a
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/remote-project-b
+  [ "$status" -eq 0 ]
+
   run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
     bash "$SCRIPTS/send.sh" testteam alice bob "remote project a" --project /tmp/remote-project-a
   [ "$status" -eq 0 ]
@@ -516,6 +549,30 @@ wait_for_http() {
   [[ "$output" =~ "remote project b" ]]
   [[ "$output" =~ "$project_a_key" ]]
   [[ "$output" =~ "$project_b_key" ]]
+}
+
+@test "remote storage: sender project inference rejects ambiguous active projects" {
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=ambiguous-client \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/ambiguous-project-a
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=ambiguous-client \
+    bash "$SCRIPTS/join.sh" testteam alice codex /tmp/ambiguous-project-b
+  [ "$status" -eq 0 ]
+
+  run env AGMSG_STORAGE_DRIVER=remote AGMSG_REMOTE_URL="$SERVER_URL" \
+    AGMSG_CLIENT_ID=ambiguous-client \
+    bash "$SCRIPTS/send.sh" testteam alice bob "ambiguous project"
+  [ "$status" -ne 0 ]
+  [[ "$output" =~ "ambiguous_project" ]]
+
+  run curl -fsS -G "$SERVER_URL/api/v1/messages/history" \
+    --data-urlencode team=testteam \
+    --data-urlencode limit=20
+  [ "$status" -eq 0 ]
+  [[ ! "$output" =~ "ambiguous project" ]]
 }
 
 @test "remote storage: check-inbox uses remote unread messages" {

@@ -146,8 +146,8 @@ Messages returned by `inbox.sh`, `history.sh`, `watch.sh`, or remote HTTP storag
 ~/.agents/skills/agmsg/scripts/inbox.sh <team> <agent_id>
 ~/.agents/skills/agmsg/scripts/inbox.sh <team> <agent_id> --wait 60 --poll 2
 
-# Send a message
-~/.agents/skills/agmsg/scripts/send.sh <team> <from_agent> <to_agent> "<message>"
+# Send a message. Always pass --project for project-scoped delivery/history.
+~/.agents/skills/agmsg/scripts/send.sh <team> <from_agent> <to_agent> "<message>" --project "$(pwd)"
 
 # Message history
 ~/.agents/skills/agmsg/scripts/history.sh <team> [agent_id] [limit]

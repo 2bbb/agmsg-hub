@@ -510,6 +510,22 @@ const WEB_UI_HTML = `<!doctype html>
       renderHistoryPager();
     }
 
+    function renderEmptyHistory() {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      if (!allMode && state.selectedProject?.project_id) {
+        empty.append(document.createTextNode("No messages for this project. Legacy unassigned messages are shown in "));
+        const link = document.createElement("a");
+        link.href = "/all";
+        link.textContent = "All history";
+        empty.append(link);
+        empty.append(document.createTextNode("."));
+      } else {
+        empty.textContent = "No messages";
+      }
+      els.messages.append(empty);
+    }
+
     function formatLocalTimestamp(value) {
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return value || "";
@@ -692,10 +708,7 @@ const WEB_UI_HTML = `<!doctype html>
       if (!allMode && !team) {
         state.historyTotal = 0;
         renderHistoryPager();
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "No messages";
-        els.messages.append(empty);
+        renderEmptyHistory();
         return;
       }
       const params = new URLSearchParams();
@@ -714,10 +727,7 @@ const WEB_UI_HTML = `<!doctype html>
       state.historyTotal = data.total || 0;
       renderHistoryPager();
       if (messages.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "No messages";
-        els.messages.append(empty);
+        renderEmptyHistory();
         return;
       }
       for (const message of messages) {
@@ -1274,10 +1284,25 @@ async function handleSend(req, res, db) {
     return;
   }
 
-  const projectId = canonicalProjectKey(payload.project_id || payload.project_key) || null;
-  const projectKey = canonicalProjectKey(payload.project_key) || null;
-  const projectPath = payload.project_path || null;
+  let projectId = canonicalProjectKey(payload.project_id || payload.project_key) || null;
+  let projectKey = canonicalProjectKey(payload.project_key) || null;
+  let projectPath = payload.project_path || null;
   const fromClientId = payload.from_client_id || null;
+  const resolvedProject = resolveMessageProject(db, {
+    team: payload.team,
+    fromAgent: payload.from_agent,
+    fromClientId,
+    projectId,
+  });
+  if (resolvedProject.error) {
+    errorResponse(res, resolvedProject.status, resolvedProject.error, resolvedProject.message);
+    return;
+  }
+  if (resolvedProject.project) {
+    projectId = resolvedProject.project.project_id;
+    projectKey = canonicalProjectKey(projectKey || resolvedProject.project.project_key || projectId) || null;
+    projectPath = projectPath || resolvedProject.project.project_path || null;
+  }
 
   const row = db.prepare(`
     INSERT INTO messages (team, from_agent, to_agent, body, project_id, project_key, project_path, from_client_id)
@@ -1286,6 +1311,78 @@ async function handleSend(req, res, db) {
   `).get(payload.team, payload.from_agent, payload.to_agent, payload.body, projectId, projectKey, projectPath, fromClientId);
 
   jsonResponse(res, 201, row);
+}
+
+function resolveMessageProject(db, { team, fromAgent, fromClientId, projectId }) {
+  const sqlProjectId = projectIdSql();
+
+  if (projectId) {
+    const row = db.prepare(`
+      SELECT
+        ${sqlProjectId} AS project_id,
+        COALESCE(project_key, '') AS project_key,
+        project_path
+      FROM registrations
+      WHERE team = ?
+        AND ${sqlProjectId} = ?
+        AND archived_at IS NULL
+      ORDER BY rowid DESC
+      LIMIT 1
+    `).get(team, projectId);
+    if (!row) {
+      return {
+        error: 'project_inactive',
+        status: 409,
+        message: 'project is not active for this team; join or restore it before sending',
+      };
+    }
+    return { project: row };
+  }
+
+  if (!fromClientId) {
+    return {
+      error: 'missing_project',
+      status: 400,
+      message: 'project_id or from_client_id is required',
+    };
+  }
+
+  const rows = db.prepare(`
+    SELECT
+      project_id,
+      COALESCE(MAX(project_key), '') AS project_key,
+      COALESCE(MAX(project_path), '') AS project_path
+    FROM (
+      SELECT
+        ${sqlProjectId} AS project_id,
+        project_key,
+        project_path
+      FROM registrations
+      WHERE team = ?
+        AND agent = ?
+        AND client_id = ?
+        AND archived_at IS NULL
+    )
+    WHERE project_id IS NOT NULL AND project_id != ''
+    GROUP BY project_id
+    ORDER BY project_id ASC
+  `).all(team, fromAgent, fromClientId);
+
+  if (rows.length === 1) {
+    return { project: rows[0] };
+  }
+  if (rows.length > 1) {
+    return {
+      error: 'ambiguous_project',
+      status: 409,
+      message: 'multiple active projects match this sender; pass project_id or --project explicitly',
+    };
+  }
+  return {
+    error: 'missing_project',
+    status: 400,
+    message: 'sender has no active project registration; join before sending or pass project_id',
+  };
 }
 
 function handleUnread(url, res, db) {
