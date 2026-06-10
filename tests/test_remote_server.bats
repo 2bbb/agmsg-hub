@@ -19,6 +19,10 @@ setup() {
 }
 
 teardown() {
+  if [ -n "${EXTRA_SERVER_PID:-}" ]; then
+    kill "$EXTRA_SERVER_PID" 2>/dev/null || true
+    wait "$EXTRA_SERVER_PID" 2>/dev/null || true
+  fi
   if [ -n "${SERVER_PID:-}" ]; then
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
@@ -47,6 +51,49 @@ wait_for_http() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ '"ok":true' ]]
   [[ "$output" =~ '"storage":"sqlite"' ]]
+}
+
+@test "server: migrates legacy messages table before project index creation" {
+  local legacy_db="$BATS_TEST_TMPDIR/legacy/messages.db"
+  local legacy_port legacy_url legacy_log legacy_pid
+  mkdir -p "$(dirname "$legacy_db")"
+  sqlite3 "$legacy_db" "
+    CREATE TABLE messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      team TEXT NOT NULL,
+      from_agent TEXT NOT NULL,
+      to_agent TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      read_at TEXT
+    );
+    INSERT INTO messages (team, from_agent, to_agent, body)
+    VALUES ('legacy', 'alice', 'bob', 'old row');
+  "
+
+  legacy_port="$(node -e "const net=require('node:net'); const s=net.createServer(); s.listen(0, '127.0.0.1', () => { console.log(s.address().port); s.close(); });")"
+  legacy_url="http://127.0.0.1:$legacy_port"
+  legacy_log="$BATS_TEST_TMPDIR/agmsgd-legacy.log"
+
+  bash "$BATS_TEST_DIRNAME/../server/server.sh" serve --host 127.0.0.1 --port "$legacy_port" --db "$legacy_db" >"$legacy_log" 2>&1 &
+  legacy_pid=$!
+  EXTRA_SERVER_PID="$legacy_pid"
+  wait_for_http "$legacy_url/api/v1/health" || {
+    cat "$legacy_log" >&2 || true
+    return 1
+  }
+
+  run sqlite3 "$legacy_db" "SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name = 'project_id';"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+
+  run sqlite3 "$legacy_db" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_messages_project';"
+  [ "$status" -eq 0 ]
+  [ "$output" -eq 1 ]
+
+  kill "$legacy_pid" 2>/dev/null || true
+  wait "$legacy_pid" 2>/dev/null || true
+  EXTRA_SERVER_PID=""
 }
 
 @test "server: root serves browser dashboard" {

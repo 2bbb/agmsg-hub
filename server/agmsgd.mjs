@@ -914,8 +914,6 @@ function initDb(path) {
       WHERE read_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_history
       ON messages(team, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_messages_project
-      ON messages(team, project_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS message_reads (
       message_id INTEGER NOT NULL,
